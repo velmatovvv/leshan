@@ -67,9 +67,10 @@ public class MultiServerRegistrationTest {
         client.waitForUpdateTo(firstServer);
         client.waitForUpdateTo(secondServer);
 
+        int firstServerPort = firstServer.getEndpoint(Protocol.COAP).getURI().getPort();
         LwM2mServer firstClientServer = client.getRegisteredServers().values().stream()
-                .filter(server -> server.getUri().getPort() == firstServer.getEndpoint(Protocol.COAP).getURI().getPort())
-                .findFirst().orElseThrow();
+                .filter(server -> java.net.URI.create(server.getUri()).getPort() == firstServerPort).findFirst()
+                .orElseThrow();
         client.triggerRegistrationUpdate(firstClientServer);
         firstServer.waitForUpdateOf(firstRegistration);
 
