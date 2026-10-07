@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -200,7 +199,7 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
 
     private List<LwM2mServer> factoryBootstrap() {
         List<LwM2mServer> servers = new ArrayList<>();
-        for (DmServerInfo serverInfo : new TreeMap<>(serversInfoExtractor.getInfo(objectEnablers).deviceManagements).values()) {
+        for (DmServerInfo serverInfo : serversInfoExtractor.getInfo(objectEnablers).deviceManagements.values()) {
             LwM2mServer server = endpointsManager.createEndpoint(serverInfo, isClientInitiatedOnly());
             if (server != null) {
                 servers.add(server);
