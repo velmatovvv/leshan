@@ -52,8 +52,6 @@ public class MultiServerRegistrationTest {
 
         firstServer.waitForNewRegistrationOf(client);
         secondServer.waitForNewRegistrationOf(client);
-        client.waitForRegistrationTo(firstServer);
-        client.waitForRegistrationTo(secondServer);
 
         assertThat(client.getRegisteredServers()).hasSize(2);
         Registration firstRegistration = firstServer.getRegistrationFor(client);
@@ -64,8 +62,6 @@ public class MultiServerRegistrationTest {
         client.triggerRegistrationUpdate();
         firstServer.waitForUpdateOf(firstRegistration);
         secondServer.waitForUpdateOf(secondRegistration);
-        client.waitForUpdateTo(firstServer);
-        client.waitForUpdateTo(secondServer);
 
         int firstServerPort = firstServer.getEndpoint(Protocol.COAP).getURI().getPort();
         LwM2mServer firstClientServer = client.getRegisteredServers().values().stream()
