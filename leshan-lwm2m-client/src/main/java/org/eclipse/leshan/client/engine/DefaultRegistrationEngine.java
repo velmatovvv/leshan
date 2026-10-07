@@ -517,9 +517,12 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
         public void run() {
             synchronized (taskLock) {
                 try {
-                    if (!registerWithRetry(server) //
-                            && !scheduleClientInitiatedBootstrap(NOW)) {
-                        scheduleRegistrationTask(server, retryWaitingTimeInMs);
+                    if (!registerWithRetry(server)) {
+                        // Do not bootstrap globally just because one DM server is unavailable.
+                        // Bootstrap is a recovery path only when no DM registration is alive.
+                        if (!registeredServers.isEmpty() || !scheduleClientInitiatedBootstrap(NOW)) {
+                            scheduleRegistrationTask(server, retryWaitingTimeInMs);
+                        }
                     }
                 } catch (InterruptedException e) {
                     LOG.info("Registration task interrupted. ");
@@ -566,9 +569,11 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
             synchronized (taskLock) {
                 try {
                     if (!updateWithRetry(server, registrationId, registrationUpdate) //
-                            && !registerWithRetry(server) //
-                            && !scheduleClientInitiatedBootstrap(NOW)) {
-                        scheduleRegistrationTask(server, retryWaitingTimeInMs);
+                            && !registerWithRetry(server)) {
+                        // Keep other server registrations alive while recovering this one.
+                        if (!registeredServers.isEmpty() || !scheduleClientInitiatedBootstrap(NOW)) {
+                            scheduleRegistrationTask(server, retryWaitingTimeInMs);
+                        }
                     }
                 } catch (InterruptedException e) {
                     LOG.info("Registration update task interrupted.");
