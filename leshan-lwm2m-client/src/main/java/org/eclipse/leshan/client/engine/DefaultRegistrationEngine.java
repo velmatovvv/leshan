@@ -16,9 +16,9 @@
  *******************************************************************************/
 package org.eclipse.leshan.client.engine;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -183,7 +183,7 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
         synchronized (this) {
             started = true;
             // Try factory bootstrap.
-            List<LwM2mServer> dmServers = factoryBootstrap();
+            Collection<LwM2mServer> dmServers = factoryBootstrap();
 
             if (dmServers.isEmpty()) {
                 // If it failed try client initiated bootstrap
@@ -197,15 +197,16 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
         }
     }
 
-    private List<LwM2mServer> factoryBootstrap() {
-        List<LwM2mServer> servers = new ArrayList<>();
-        for (DmServerInfo serverInfo : serversInfoExtractor.getInfo(objectEnablers).deviceManagements.values()) {
+    private Collection<LwM2mServer> factoryBootstrap() {
+        Map<Long, DmServerInfo> serverInfos = serversInfoExtractor.getInfo(objectEnablers).deviceManagements;
+        Map<Long, LwM2mServer> servers = new ConcurrentHashMap<>();
+        serverInfos.forEach((id, serverInfo) -> {
             LwM2mServer server = endpointsManager.createEndpoint(serverInfo, isClientInitiatedOnly());
             if (server != null) {
-                servers.add(server);
+                servers.put(id, server);
             }
-        }
-        return servers;
+        });
+        return servers.values();
     }
 
     private boolean isClientInitiatedOnly() {
@@ -377,7 +378,7 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
         public void run() {
             synchronized (taskLock) {
                 try {
-                    List<LwM2mServer> dmServers = clientInitiatedBootstrap();
+                    Collection<LwM2mServer> dmServers = clientInitiatedBootstrap();
                     if (dmServers.isEmpty()) {
                         // clientInitiatatedBootstrapTask is considered as finished.
                         // see https://github.com/eclipse/leshan/issues/701
@@ -400,7 +401,7 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
             }
         }
 
-        private List<LwM2mServer> clientInitiatedBootstrap() throws InterruptedException {
+        private Collection<LwM2mServer> clientInitiatedBootstrap() throws InterruptedException {
             ServerInfo bootstrapServerInfo = serversInfoExtractor.getBootstrapServerInfo(objectEnablers);
 
             if (bootstrapServerInfo == null) {
@@ -455,7 +456,7 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
                                 return Collections.emptyList();
                             } else {
                                 LOG.info("Bootstrap finished {}.", bootstrapServer.getUri());
-                                List<LwM2mServer> dmServers = factoryBootstrap();
+                                Collection<LwM2mServer> dmServers = factoryBootstrap();
                                 if (observer != null) {
                                     observer.onBootstrapSuccess(bootstrapServer, request);
                                 }
