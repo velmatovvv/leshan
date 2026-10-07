@@ -261,6 +261,7 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
                 // Add server to registered one
                 String registrationID = response.getRegistrationID();
                 registeredServers.put(registrationID, server);
+                registerFutures.remove(server.getId());
                 LOG.info("Registered with location '{}'.", registrationID);
 
                 // Update every lifetime period
@@ -497,6 +498,10 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
         if (!started)
             return;
 
+        Future<?> previous = registerFutures.remove(dmServer.getId());
+        if (previous != null && !previous.isDone()) {
+            previous.cancel(false);
+        }
         if (timeInMs > 0) {
             LOG.info("Try to register to {} again in {}s...", dmServer.getUri(), timeInMs / 1000);
             registerFutures.put(dmServer.getId(),
@@ -541,6 +546,10 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
         if (!started)
             return;
 
+        Future<?> previous = updateFutures.remove(registrationId);
+        if (previous != null && !previous.isDone()) {
+            previous.cancel(false);
+        }
         if (timeInMs > 0) {
             LOG.info("Next registration update to {} in {}s...", server.getUri(), timeInMs / 1000);
             updateFutures.put(registrationId, schedExecutor.schedule(
