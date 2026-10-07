@@ -1,0 +1,33 @@
+name: Fork Validation
+
+on:
+  pull_request:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate multi-server client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Set up JDK 17
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Format
+        run: mvn -B formatter:validate
+      - name: Build
+        run: mvn -B install -PCompileOnly
+      - name: Imports
+        run: mvn -B impsort:check
+      - name: Unit tests
+        run: mvn -B surefire:test '-Dtest=!org.eclipse.leshan.integration.tests.**' -Dsurefire.failIfNoSpecifiedTests=false -Dskip.npm
+      - name: Multi-server integration test
+        run: mvn -B -pl leshan-integration-tests -am surefire:test '-Dtest=org.eclipse.leshan.integration.tests.MultiServerRegistrationTest' -Dsurefire.failIfNoSpecifiedTests=false
