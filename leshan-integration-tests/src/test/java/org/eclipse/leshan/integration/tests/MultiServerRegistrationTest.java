@@ -16,6 +16,8 @@ import org.eclipse.leshan.integration.tests.util.LeshanTestClient;
 import org.eclipse.leshan.integration.tests.util.LeshanTestServer;
 import org.eclipse.leshan.integration.tests.util.LeshanTestServerBuilder;
 import org.eclipse.leshan.server.registration.Registration;
+import java.util.concurrent.TimeUnit;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -50,8 +52,8 @@ public class MultiServerRegistrationTest {
 
         client.start();
 
-        firstServer.waitForNewRegistrationOf(client);
-        secondServer.waitForNewRegistrationOf(client);
+        firstServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
+        secondServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
 
         assertThat(client.getRegisteredServers()).hasSize(2);
         Registration firstRegistration = firstServer.getRegistrationFor(client);
