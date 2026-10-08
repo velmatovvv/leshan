@@ -21,7 +21,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
-      - name: Format
+      - name: Format sources
+        run: mvn -B formatter:format
+      - name: Validate formatting
         run: mvn -B formatter:validate
       - name: Build
         run: mvn -B install -PCompileOnly
