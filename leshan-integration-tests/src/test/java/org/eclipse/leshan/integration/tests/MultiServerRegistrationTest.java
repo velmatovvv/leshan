@@ -66,7 +66,7 @@ public class MultiServerRegistrationTest {
         int firstServerPort = firstServer.getEndpoint(Protocol.COAP).getURI().getPort();
         LwM2mServer firstClientServer = client.getRegisteredServers().values().stream()
                 .filter(server -> java.net.URI.create(server.getUri()).getPort() == firstServerPort).findFirst()
-                .orElseThrow();
+                .orElseThrow(() -> new IllegalStateException("First DM server registration not found"));
         client.triggerRegistrationUpdate(firstClientServer);
         firstServer.waitForUpdateOf(firstRegistration);
 
