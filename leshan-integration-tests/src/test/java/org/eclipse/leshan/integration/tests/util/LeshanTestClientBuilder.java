@@ -175,16 +175,24 @@ public class LeshanTestClientBuilder extends LeshanClientBuilder {
                     }
                     List<LwM2mInstanceEnabler> securityInstances = new java.util.ArrayList<>();
                     List<LwM2mInstanceEnabler> serverInstances = new java.util.ArrayList<>();
-                    securityInstances.add(Security.noSec(uri.toString(), serverID));
-                    serverInstances.add(new Server(serverID, lifetime));
+                    Security primarySecurity = Security.noSec(uri.toString(), serverID);
+                    primarySecurity.setId(0);
+                    Server primaryServer = new Server(serverID, lifetime);
+                    primaryServer.setId(0);
+                    securityInstances.add(primarySecurity);
+                    serverInstances.add(primaryServer);
 
                     int additionalServerID = serverID + 1;
                     for (LeshanServer additionalServer : additionalServers) {
                         LwM2mServerEndpoint endpoint = additionalServer.getEndpoint(protocolToUse);
                         EndpointUri additionalUri = uriHandler.replaceAddress(endpoint.getURI(),
                                 new InetSocketAddress("localhost", endpoint.getURI().getPort()));
-                        securityInstances.add(Security.noSec(additionalUri.toString(), additionalServerID));
-                        serverInstances.add(new Server(additionalServerID, lifetime));
+                        Security additionalSecurity = Security.noSec(additionalUri.toString(), additionalServerID);
+                        additionalSecurity.setId(additionalServerID - serverID);
+                        Server additionalServerInstance = new Server(additionalServerID, lifetime);
+                        additionalServerInstance.setId(additionalServerID - serverID);
+                        securityInstances.add(additionalSecurity);
+                        serverInstances.add(additionalServerInstance);
                         additionalServerID++;
                     }
                     initializer.setInstancesForObject(LwM2mId.SECURITY,
