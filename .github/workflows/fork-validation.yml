@@ -32,7 +32,7 @@ jobs:
       - name: Unit tests
         run: mvn -B surefire:test '-Dtest=!org.eclipse.leshan.integration.tests.**' -Dsurefire.failIfNoSpecifiedTests=false -Dskip.npm
       - name: Multi-server integration test
-        run: mvn -B -pl leshan-integration-tests -am surefire:test '-Dtest=org.eclipse.leshan.integration.tests.MultiServerRegistrationTest' -Dsurefire.failIfNoSpecifiedTests=false -Dorg.slf4j.simpleLogger.defaultLogLevel=trace -Dorg.slf4j.simpleLogger.showThreadName=true -Dorg.slf4j.simpleLogger.showDateTime=true -Dorg.slf4j.simpleLogger.log.org.eclipse.leshan=trace -Dorg.slf4j.simpleLogger.log.org.eclipse.californium=debug -Dsurefire.rerunFailingTestsCount=0
+        run: mvn -B -pl leshan-integration-tests -am surefire:test '-Dtest=org.eclipse.leshan.integration.tests.MultiServerRegistrationTest' -Dsurefire.failIfNoSpecifiedTests=false -Dorg.slf4j.simpleLogger.defaultLogLevel=trace -Dorg.slf4j.simpleLogger.showThreadName=true -Dorg.slf4j.simpleLogger.showDateTime=true -Dorg.slf4j.simpleLogger.log.org.eclipse.leshan=trace -Dorg.slf4j.simpleLogger.log.org.eclipse.californium=trace -Dorg.slf4j.simpleLogger.log.org.eclipse.californium.core.network=trace -Dsurefire.rerunFailingTestsCount=0
 
       - name: Upload multi-server test diagnostics
         if: failure()
