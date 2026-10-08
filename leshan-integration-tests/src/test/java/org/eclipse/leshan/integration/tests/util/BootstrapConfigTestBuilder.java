@@ -119,18 +119,20 @@ public class BootstrapConfigTestBuilder {
     }
 
     public BootstrapConfigTestBuilder adding(Protocol protocol, LeshanTestServer server) {
+        return adding(protocol, server, 1, 0, 2222);
+    }
 
-        // security for DM server
+    public BootstrapConfigTestBuilder adding(Protocol protocol, LeshanTestServer server, int securityInstanceId,
+            int serverInstanceId, int shortServerId) {
         ServerSecurity dmSecurity = new ServerSecurity();
         dmSecurity.uri = server.getEndpoint(protocol).getURI().toString();
-        dmSecurity.serverId = 2222;
+        dmSecurity.serverId = shortServerId;
         dmSecurity.securityMode = SecurityMode.NO_SEC;
-        bsConfig.security.put(1, dmSecurity);
+        bsConfig.security.put(securityInstanceId, dmSecurity);
 
-        // DM server
         ServerConfig dmConfig = new ServerConfig();
-        dmConfig.shortId = 2222;
-        bsConfig.servers.put(0, dmConfig);
+        dmConfig.shortId = shortServerId;
+        bsConfig.servers.put(serverInstanceId, dmConfig);
         return this;
     }
 

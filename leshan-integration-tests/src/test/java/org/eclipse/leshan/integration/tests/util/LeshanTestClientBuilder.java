@@ -97,6 +97,7 @@ public class LeshanTestClientBuilder extends LeshanClientBuilder {
     private Mode endpointNameMode = Mode.ALWAYS;
     private Protocol protocolToUse;
     private LeshanServer server;
+    private final List<LeshanServer> additionalServers = new java.util.ArrayList<>();
     private LeshanBootstrapServer bootstrapServer;
     private ReverseProxy proxy;
 
@@ -166,7 +167,41 @@ public class LeshanTestClientBuilder extends LeshanClientBuilder {
                         initializer.setInstancesForObject(LwM2mId.SECURITY, Security.noSec(uri.toString(), serverID));
                     }
                 }
-                initializer.setInstancesForObject(LwM2mId.SERVER, new Server(serverID, lifetime));
+                if (!additionalServers.isEmpty()) {
+                    if (pskIdentity != null || clientPublicKey != null || clientCertificate != null
+                            || oscoreSetting != null) {
+                        throw new IllegalStateException(
+                                "Multi-server integration fixture currently supports NoSec servers only.");
+                    }
+                    List<LwM2mInstanceEnabler> securityInstances = new java.util.ArrayList<>();
+                    List<LwM2mInstanceEnabler> serverInstances = new java.util.ArrayList<>();
+                    Security primarySecurity = Security.noSec(uri.toString(), serverID);
+                    primarySecurity.setId(0);
+                    Server primaryServer = new Server(serverID, lifetime);
+                    primaryServer.setId(0);
+                    securityInstances.add(primarySecurity);
+                    serverInstances.add(primaryServer);
+
+                    int additionalServerID = serverID + 1;
+                    for (LeshanServer additionalServer : additionalServers) {
+                        LwM2mServerEndpoint endpoint = additionalServer.getEndpoint(protocolToUse);
+                        EndpointUri additionalUri = uriHandler.replaceAddress(endpoint.getURI(),
+                                new InetSocketAddress("localhost", endpoint.getURI().getPort()));
+                        Security additionalSecurity = Security.noSec(additionalUri.toString(), additionalServerID);
+                        additionalSecurity.setId(additionalServerID - serverID);
+                        Server additionalServerInstance = new Server(additionalServerID, lifetime);
+                        additionalServerInstance.setId(additionalServerID - serverID);
+                        securityInstances.add(additionalSecurity);
+                        serverInstances.add(additionalServerInstance);
+                        additionalServerID++;
+                    }
+                    initializer.setInstancesForObject(LwM2mId.SECURITY,
+                            securityInstances.toArray(new LwM2mInstanceEnabler[0]));
+                    initializer.setInstancesForObject(LwM2mId.SERVER,
+                            serverInstances.toArray(new LwM2mInstanceEnabler[0]));
+                } else {
+                    initializer.setInstancesForObject(LwM2mId.SERVER, new Server(serverID, lifetime));
+                }
             }
             // connect to LWM2M Bootstrap Server
             else if (bootstrapServer != null) {
@@ -367,6 +402,11 @@ public class LeshanTestClientBuilder extends LeshanClientBuilder {
 
     public LeshanTestClientBuilder connectingTo(LeshanServer server) {
         this.server = server;
+        return this;
+    }
+
+    public LeshanTestClientBuilder alsoConnectingTo(LeshanServer... servers) {
+        additionalServers.addAll(Arrays.asList(servers));
         return this;
     }
 
