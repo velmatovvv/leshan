@@ -8,12 +8,16 @@
 package org.eclipse.leshan.integration.tests;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.leshan.integration.tests.util.BootstrapConfigTestBuilder.givenBootstrapConfig;
+import static org.eclipse.leshan.integration.tests.util.LeshanTestBootstrapServerBuilder.givenBootstrapServerUsing;
 import static org.eclipse.leshan.integration.tests.util.LeshanTestClientBuilder.givenClientUsing;
 
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.leshan.bsserver.InvalidConfigurationException;
 import org.eclipse.leshan.client.servers.LwM2mServer;
 import org.eclipse.leshan.core.endpoint.Protocol;
+import org.eclipse.leshan.integration.tests.util.LeshanTestBootstrapServer;
 import org.eclipse.leshan.integration.tests.util.LeshanTestClient;
 import org.eclipse.leshan.integration.tests.util.LeshanTestServer;
 import org.eclipse.leshan.integration.tests.util.LeshanTestServerBuilder;
@@ -23,6 +27,7 @@ import org.junit.jupiter.api.Test;
 
 public class MultiServerRegistrationTest {
 
+    private LeshanTestBootstrapServer bootstrapServer;
     private LeshanTestServer firstServer;
     private LeshanTestServer secondServer;
     private LeshanTestClient client;
@@ -31,6 +36,9 @@ public class MultiServerRegistrationTest {
     public void stop() {
         if (client != null) {
             client.destroy(false);
+        }
+        if (bootstrapServer != null) {
+            bootstrapServer.destroy();
         }
         if (firstServer != null) {
             firstServer.destroy();
@@ -41,20 +49,27 @@ public class MultiServerRegistrationTest {
     }
 
     @Test
-    public void register_update_and_deregister_with_two_dm_servers() {
+    public void register_update_and_deregister_with_two_dm_servers() throws InvalidConfigurationException {
         firstServer = new LeshanTestServerBuilder(Protocol.COAP).with("Californium").build();
         secondServer = new LeshanTestServerBuilder(Protocol.COAP).with("Californium").build();
         firstServer.start();
         secondServer.start();
 
-        client = givenClientUsing(Protocol.COAP).with("Californium").connectingTo(firstServer)
-                .alsoConnectingTo(secondServer).build();
+        bootstrapServer = givenBootstrapServerUsing(Protocol.COAP).with("Californium").build();
+        bootstrapServer.start();
+
+        client = givenClientUsing(Protocol.COAP).with("Californium").connectingTo(bootstrapServer).build();
+        bootstrapServer.getConfigStore().add(client.getEndpointName(), givenBootstrapConfig()
+                .adding(Protocol.COAP, bootstrapServer)
+                .adding(Protocol.COAP, firstServer)
+                .adding(Protocol.COAP, secondServer).build());
 
         client.start();
         System.out.println("MULTI_SERVER_PORTS first=" + firstServer.getEndpoint(Protocol.COAP).getURI()
                 + " second=" + secondServer.getEndpoint(Protocol.COAP).getURI()
                 + " registered=" + client.getRegisteredServers());
 
+        bootstrapServer.waitForSuccessfullBootstrap(10, TimeUnit.SECONDS);
         firstServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
         secondServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
 
