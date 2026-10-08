@@ -552,9 +552,9 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
         }
         if (timeInMs > 0) {
             LOG.info("Next registration update to {} in {}s...", server.getUri(), timeInMs / 1000);
-            updateFutures.put(registrationId, schedExecutor.schedule(
-                    new UpdateRegistrationTask(server, registrationId, registrationUpdate), timeInMs,
-                    TimeUnit.MILLISECONDS));
+            updateFutures.put(registrationId,
+                    schedExecutor.schedule(new UpdateRegistrationTask(server, registrationId, registrationUpdate),
+                            timeInMs, TimeUnit.MILLISECONDS));
         } else {
             updateFutures.put(registrationId,
                     schedExecutor.submit(new UpdateRegistrationTask(server, registrationId, registrationUpdate)));

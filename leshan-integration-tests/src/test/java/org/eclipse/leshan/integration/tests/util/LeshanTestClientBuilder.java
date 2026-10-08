@@ -168,7 +168,8 @@ public class LeshanTestClientBuilder extends LeshanClientBuilder {
                     }
                 }
                 if (!additionalServers.isEmpty()) {
-                    if (pskIdentity != null || clientPublicKey != null || clientCertificate != null || oscoreSetting != null) {
+                    if (pskIdentity != null || clientPublicKey != null || clientCertificate != null
+                            || oscoreSetting != null) {
                         throw new IllegalStateException(
                                 "Multi-server integration fixture currently supports NoSec servers only.");
                     }
