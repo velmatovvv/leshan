@@ -525,7 +525,9 @@ public class DefaultRegistrationEngine implements RegistrationEngine {
                     if (!registerWithRetry(server)) {
                         // Do not bootstrap globally just because one DM server is unavailable.
                         // Bootstrap is a recovery path only when no DM registration is alive.
-                        if (!registeredServers.isEmpty() || !scheduleClientInitiatedBootstrap(NOW)) {
+                        if (!registeredServers.isEmpty()
+                                || serversInfoExtractor.getInfo(objectEnablers).deviceManagements.size() > 1
+                                || !scheduleClientInitiatedBootstrap(NOW)) {
                             scheduleRegistrationTask(server, retryWaitingTimeInMs);
                         }
                     }
