@@ -66,8 +66,8 @@ public class MultiServerRegistrationTest {
         client = givenClientUsing(Protocol.COAP).with("Californium").connectingTo(bootstrapServer).build();
         bootstrapServer.getConfigStore().add(client.getEndpointName(), givenBootstrapConfig()
                 .adding(Protocol.COAP, bootstrapServer)
-                .adding(Protocol.COAP, firstServer)
-                .adding(Protocol.COAP, secondServer).build());
+                .adding(Protocol.COAP, firstServer, 1, 0, 2222)
+                .adding(Protocol.COAP, secondServer, 2, 1, 2223).build());
 
         client.start();
         System.out.println("MULTI_SERVER_PORTS first=" + firstServer.getEndpoint(Protocol.COAP).getURI()
