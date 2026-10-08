@@ -8,6 +8,7 @@
 package org.eclipse.leshan.integration.tests;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.leshan.client.servers.LwM2mServer.SYSTEM;
 import static org.eclipse.leshan.integration.tests.util.BootstrapConfigTestBuilder.givenBootstrapConfig;
 import static org.eclipse.leshan.integration.tests.util.LeshanTestBootstrapServerBuilder.givenBootstrapServerUsing;
 import static org.eclipse.leshan.integration.tests.util.LeshanTestClientBuilder.givenClientUsing;
@@ -16,7 +17,11 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.leshan.bsserver.InvalidConfigurationException;
 import org.eclipse.leshan.client.servers.LwM2mServer;
+import org.eclipse.leshan.core.LwM2mId;
 import org.eclipse.leshan.core.endpoint.Protocol;
+import org.eclipse.leshan.core.node.LwM2mObject;
+import org.eclipse.leshan.core.node.LwM2mObjectInstance;
+import org.eclipse.leshan.core.request.ReadRequest;
 import org.eclipse.leshan.integration.tests.util.LeshanTestBootstrapServer;
 import org.eclipse.leshan.integration.tests.util.LeshanTestClient;
 import org.eclipse.leshan.integration.tests.util.LeshanTestServer;
@@ -70,6 +75,23 @@ public class MultiServerRegistrationTest {
                 + " registered=" + client.getRegisteredServers());
 
         bootstrapServer.waitForSuccessfullBootstrap(10, TimeUnit.SECONDS);
+        LwM2mObject security = (LwM2mObject) client.getObjectTree()
+                .getObjectEnabler(LwM2mId.SECURITY).read(SYSTEM, new ReadRequest(LwM2mId.SECURITY)).getContent();
+        LwM2mObject servers = (LwM2mObject) client.getObjectTree()
+                .getObjectEnabler(LwM2mId.SERVER).read(SYSTEM, new ReadRequest(LwM2mId.SERVER)).getContent();
+        for (LwM2mObjectInstance instance : security.getInstances().values()) {
+            System.out.println("BOOTSTRAP_SECURITY instance=" + instance.getId()
+                    + " uri=" + instance.getResource(LwM2mId.SEC_SERVER_URI).getValue()
+                    + " serverId=" + instance.getResource(LwM2mId.SEC_SERVER_ID).getValue()
+                    + " bootstrap=" + instance.getResource(LwM2mId.SEC_BOOTSTRAP).getValue());
+        }
+        for (LwM2mObjectInstance instance : servers.getInstances().values()) {
+            System.out.println("BOOTSTRAP_DM_SERVER instance=" + instance.getId()
+                    + " serverId=" + instance.getResource(LwM2mId.SRV_SERVER_ID).getValue()
+                    + " lifetime=" + instance.getResource(LwM2mId.SRV_LIFETIME).getValue());
+        }
+        assertThat(security.getInstances()).hasSize(3);
+        assertThat(servers.getInstances()).hasSize(2);
         firstServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
         secondServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
 
