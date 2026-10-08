@@ -32,4 +32,12 @@ jobs:
       - name: Unit tests
         run: mvn -B surefire:test '-Dtest=!org.eclipse.leshan.integration.tests.**' -Dsurefire.failIfNoSpecifiedTests=false -Dskip.npm
       - name: Multi-server integration test
-        run: mvn -B -pl leshan-integration-tests -am surefire:test '-Dtest=org.eclipse.leshan.integration.tests.MultiServerRegistrationTest' -Dsurefire.failIfNoSpecifiedTests=false
+        run: mvn -B -pl leshan-integration-tests -am surefire:test '-Dtest=org.eclipse.leshan.integration.tests.MultiServerRegistrationTest' -Dsurefire.failIfNoSpecifiedTests=false -Dorg.slf4j.simpleLogger.defaultLogLevel=debug
+
+      - name: Upload multi-server test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: multi-server-surefire-reports
+          path: leshan-integration-tests/target/surefire-reports/
+          if-no-files-found: ignore
