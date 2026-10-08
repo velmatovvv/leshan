@@ -51,6 +51,9 @@ public class MultiServerRegistrationTest {
                 .alsoConnectingTo(secondServer).build();
 
         client.start();
+        System.out.println("MULTI_SERVER_PORTS first=" + firstServer.getEndpoint(Protocol.COAP).getURI()
+                + " second=" + secondServer.getEndpoint(Protocol.COAP).getURI()
+                + " registered=" + client.getRegisteredServers());
 
         firstServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
         secondServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
