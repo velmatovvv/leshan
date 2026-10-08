@@ -123,14 +123,23 @@ public class BootstrapConfigTestBuilder {
         // security for DM server
         ServerSecurity dmSecurity = new ServerSecurity();
         dmSecurity.uri = server.getEndpoint(protocol).getURI().toString();
-        dmSecurity.serverId = 2222;
+        int serverInstanceId = 0;
+        while (bsConfig.servers.containsKey(serverInstanceId)) {
+            serverInstanceId++;
+        }
+        int securityInstanceId = 1;
+        while (bsConfig.security.containsKey(securityInstanceId)) {
+            securityInstanceId++;
+        }
+        int serverId = 2222 + serverInstanceId;
+        dmSecurity.serverId = serverId;
         dmSecurity.securityMode = SecurityMode.NO_SEC;
-        bsConfig.security.put(1, dmSecurity);
+        bsConfig.security.put(securityInstanceId, dmSecurity);
 
         // DM server
         ServerConfig dmConfig = new ServerConfig();
-        dmConfig.shortId = 2222;
-        bsConfig.servers.put(0, dmConfig);
+        dmConfig.shortId = serverId;
+        bsConfig.servers.put(serverInstanceId, dmConfig);
         return this;
     }
 
