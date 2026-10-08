@@ -81,15 +81,17 @@ public class MultiServerRegistrationTest {
                 .getObjectEnabler(LwM2mId.SERVER).read(SYSTEM, new ReadRequest(LwM2mId.SERVER)).getContent();
         for (LwM2mObjectInstance instance : security.getInstances().values()) {
             System.out.println("BOOTSTRAP_SECURITY instance=" + instance.getId()
-                    + " uri=" + instance.getResource(LwM2mId.SEC_SERVER_URI).getValue()
-                    + " serverId=" + instance.getResource(LwM2mId.SEC_SERVER_ID).getValue()
-                    + " bootstrap=" + instance.getResource(LwM2mId.SEC_BOOTSTRAP).getValue());
+                    + " uri=" + instance.getResource(LwM2mId.SEC_SERVER_URI)
+                    + " serverId=" + instance.getResource(LwM2mId.SEC_SERVER_ID)
+                    + " bootstrap=" + instance.getResource(LwM2mId.SEC_BOOTSTRAP));
         }
         for (LwM2mObjectInstance instance : servers.getInstances().values()) {
             System.out.println("BOOTSTRAP_DM_SERVER instance=" + instance.getId()
-                    + " serverId=" + instance.getResource(LwM2mId.SRV_SERVER_ID).getValue()
-                    + " lifetime=" + instance.getResource(LwM2mId.SRV_LIFETIME).getValue());
+                    + " serverId=" + instance.getResource(LwM2mId.SRV_SERVER_ID)
+                    + " lifetime=" + instance.getResource(LwM2mId.SRV_LIFETIME));
         }
+        System.out.println("BOOTSTRAP_SECURITY_INSTANCES " + security.getInstances());
+        System.out.println("BOOTSTRAP_SERVER_INSTANCES " + servers.getInstances());
         assertThat(security.getInstances()).hasSize(3);
         assertThat(servers.getInstances()).hasSize(2);
         firstServer.waitForNewRegistrationOf(client, 10, TimeUnit.SECONDS);
