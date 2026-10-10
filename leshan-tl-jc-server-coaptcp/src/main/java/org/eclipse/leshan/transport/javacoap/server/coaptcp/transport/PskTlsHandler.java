@@ -17,13 +17,16 @@ package org.eclipse.leshan.transport.javacoap.server.coaptcp.transport;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.bouncycastle.tls.AlertDescription;
 import org.bouncycastle.tls.PSKTlsServer;
 import org.bouncycastle.tls.ProtocolVersion;
+import org.bouncycastle.tls.TlsFatalAlert;
 import org.bouncycastle.tls.TlsPSKIdentityManager;
 import org.bouncycastle.tls.TlsServerProtocol;
 import org.bouncycastle.tls.crypto.impl.bc.BcTlsCrypto;
@@ -46,10 +49,17 @@ public class PskTlsHandler extends ChannelDuplexHandler {
     private final SecurityStore securityStore;
     private final TlsServerProtocol protocol = new TlsServerProtocol();
     private TransportContext transportContext;
+    private volatile String pskIdentity;
+    private String endpoint;
+    private byte[] handshakeKey;
     private ScheduledFuture<?> handshakeTimeout;
 
     public PskTlsHandler(SecurityStore securityStore) {
         this.securityStore = securityStore;
+    }
+
+    public String getPskIdentity() {
+        return pskIdentity;
     }
 
     public TransportContext getTransportContext() {
@@ -79,7 +89,14 @@ public class PskTlsHandler extends ChannelDuplexHandler {
                     return null;
                 }
                 SecurityInfo info = securityStore.getByIdentity(name);
-                return info == null || info.getPreSharedKey() == null ? null : info.getPreSharedKey().clone();
+                if (info == null || info.getPreSharedKey() == null) {
+                    return null;
+                }
+                pskIdentity = name;
+                endpoint = info.getEndpoint();
+                clearHandshakeKey();
+                handshakeKey = info.getPreSharedKey().clone();
+                return handshakeKey.clone();
             }
         }) {
             @Override
@@ -94,10 +111,20 @@ public class PskTlsHandler extends ChannelDuplexHandler {
 
             @Override
             public void notifyHandshakeComplete() throws IOException {
-                super.notifyHandshakeComplete();
-                transportContext = PskTls.context(context.getSecurityParametersConnection(),
-                        new String(context.getSecurityParametersConnection().getPSKIdentity(), StandardCharsets.UTF_8));
-                handshakeTimeout.cancel(false);
+                try {
+                    // A key may have been removed or replaced while the handshake was in progress.
+                    SecurityInfo current = securityStore.getByIdentity(pskIdentity);
+                    if (current == null || !endpoint.equals(current.getEndpoint()) || current.getPreSharedKey() == null
+                            || handshakeKey == null
+                            || !MessageDigest.isEqual(handshakeKey, current.getPreSharedKey())) {
+                        throw new TlsFatalAlert(AlertDescription.access_denied);
+                    }
+                    super.notifyHandshakeComplete();
+                    transportContext = PskTls.context(context.getSecurityParametersConnection(), pskIdentity);
+                    handshakeTimeout.cancel(false);
+                } finally {
+                    clearHandshakeKey();
+                }
             }
         });
         // Suppress connection activation until authentication completes.
@@ -158,11 +185,19 @@ public class PskTlsHandler extends ChannelDuplexHandler {
         }
     }
 
+    private void clearHandshakeKey() {
+        if (handshakeKey != null) {
+            Arrays.fill(handshakeKey, (byte) 0);
+            handshakeKey = null;
+        }
+    }
+
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         if (handshakeTimeout != null) {
             handshakeTimeout.cancel(false);
         }
+        clearHandshakeKey();
         super.channelInactive(ctx);
     }
 }

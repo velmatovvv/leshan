@@ -25,6 +25,7 @@ import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.CoapTcpTra
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.DefaultTransportContextMatcher;
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.NettyCoapTcpTransport;
 import org.eclipse.leshan.transport.javacoap.server.endpoint.AbstractJavaCoapServerEndpointsProvider;
+import org.eclipse.leshan.transport.javacoap.server.observation.LwM2mObservationsStore;
 
 import com.mbed.coap.packet.BlockSize;
 import com.mbed.coap.packet.CoapRequest;
@@ -48,9 +49,13 @@ public class JavaCoapTcpServerEndpointsProvider extends AbstractJavaCoapServerEn
     protected CoapServer createCoapServer(InetSocketAddress localAddress, ServerSecurityInfo serverSecurityInfo,
             SecurityStore securityStore, Service<CoapRequest, CoapResponse> resources,
             NotificationsReceiver notificationReceiver, ObservationsStore observationsStore) {
+        NettyCoapTcpTransport transport = new NettyCoapTcpTransport(localAddress, new CoapTcpTransportResolver(),
+                new DefaultTransportContextMatcher(), null);
+        if (observationsStore instanceof LwM2mObservationsStore) {
+            transport.setConnectionClosedListener(((LwM2mObservationsStore) observationsStore)::removeByPeer);
+        }
         return createCoapServer() //
-                .transport(new NettyCoapTcpTransport(localAddress, new CoapTcpTransportResolver(),
-                        new DefaultTransportContextMatcher(), null)) //
+                .transport(transport) //
                 .blockSize(BlockSize.S_1024_BERT) //
                 .maxIncomingBlockTransferSize(4000) //
                 .maxMessageSize(2100) //

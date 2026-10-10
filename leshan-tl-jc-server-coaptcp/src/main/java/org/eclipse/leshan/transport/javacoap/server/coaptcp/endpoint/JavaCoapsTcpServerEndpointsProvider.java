@@ -44,6 +44,7 @@ import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.NettyCoapT
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.PskTlsHandler;
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.TransportContextHandler;
 import org.eclipse.leshan.transport.javacoap.server.endpoint.AbstractJavaCoapServerEndpointsProvider;
+import org.eclipse.leshan.transport.javacoap.server.observation.LwM2mObservationsStore;
 
 import com.mbed.coap.packet.BlockSize;
 import com.mbed.coap.packet.CoapRequest;
@@ -67,6 +68,8 @@ import io.netty.util.Attribute;
 public class JavaCoapsTcpServerEndpointsProvider extends AbstractJavaCoapServerEndpointsProvider {
 
     private final boolean pskOnly;
+    private EditableSecurityStore listenerStore;
+    private SecurityStoreListener connectionCleaner;
 
     public JavaCoapsTcpServerEndpointsProvider(InetSocketAddress localAddress) {
         this(localAddress, false);
@@ -132,6 +135,9 @@ public class JavaCoapsTcpServerEndpointsProvider extends AbstractJavaCoapServerE
                     new LwM2mTransportContextMatcher(), sslContext);
         }
 
+        if (observationsStore instanceof LwM2mObservationsStore) {
+            transport.setConnectionClosedListener(((LwM2mObservationsStore) observationsStore)::removeByPeer);
+        }
         createAndAttachConnectionCleaner(transport, securityStore);
 
         return createCoapServer() //
@@ -151,12 +157,22 @@ public class JavaCoapsTcpServerEndpointsProvider extends AbstractJavaCoapServerE
 
     protected void createAndAttachConnectionCleaner(NettyCoapTcpTransport transport, SecurityStore securityStore) {
         if (securityStore instanceof EditableSecurityStore) {
-            ((EditableSecurityStore) securityStore).addListener(new SecurityStoreListener() {
+            detachConnectionCleaner();
+            listenerStore = (EditableSecurityStore) securityStore;
+            connectionCleaner = new SecurityStoreListener() {
 
                 @Override
                 public void securityInfoRemoved(boolean infosAreCompromised, SecurityInfo... infos) {
 
                     transport.closeConnections(channel -> {
+                        PskTlsHandler pending = channel.pipeline().get(PskTlsHandler.class);
+                        if (pending != null && pending.getPskIdentity() != null) {
+                            for (SecurityInfo info : infos) {
+                                if (info != null && pending.getPskIdentity().equals(info.getPskIdentity())) {
+                                    return true;
+                                }
+                            }
+                        }
                         Attribute<TransportContext> attr = channel.attr(TransportContextHandler.TRANSPORT_CONTEXT_ATTR);
                         if (attr != null && attr.get() != null) {
                             Principal principal = attr.get().get(TlsTransportContextKeys.PRINCIPAL);
@@ -183,7 +199,25 @@ public class JavaCoapsTcpServerEndpointsProvider extends AbstractJavaCoapServerE
                         return false;
                     });
                 }
-            });
+            };
+            listenerStore.addListener(connectionCleaner);
+        }
+    }
+
+    private void detachConnectionCleaner() {
+        if (listenerStore != null && connectionCleaner != null) {
+            listenerStore.removeListener(connectionCleaner);
+            listenerStore = null;
+            connectionCleaner = null;
+        }
+    }
+
+    @Override
+    public void destroy() {
+        try {
+            super.destroy();
+        } finally {
+            detachConnectionCleaner();
         }
     }
 }

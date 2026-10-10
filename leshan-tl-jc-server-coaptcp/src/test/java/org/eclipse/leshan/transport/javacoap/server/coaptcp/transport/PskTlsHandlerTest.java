@@ -36,6 +36,7 @@ import org.eclipse.leshan.transport.javacoap.identity.PskPrincipal;
 import org.eclipse.leshan.transport.javacoap.identity.TlsTransportContextKeys;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -117,4 +118,68 @@ public class PskTlsHandlerTest {
             channel.finishAndReleaseAll();
         }
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = { false, true })
+    public void credentialsRevokedDuringHandshakeCannotAuthenticate(boolean rotate) throws Exception {
+        InMemorySecurityStore store = new InMemorySecurityStore() {
+            private boolean firstLookup = true;
+
+            @Override
+            public SecurityInfo getByIdentity(String identity) {
+                SecurityInfo result = super.getByIdentity(identity);
+                if (firstLookup && result != null) {
+                    firstLookup = false;
+                    remove(result.getEndpoint(), true);
+                    if (rotate) {
+                        byte[] replacement = KEY.clone();
+                        replacement[0] ^= 1;
+                        try {
+                            add(SecurityInfo.newPreSharedKeyInfo("endpoint", IDENTITY, replacement));
+                        } catch (Exception e) {
+                            throw new IllegalStateException(e);
+                        }
+                    }
+                }
+                return result;
+            }
+        };
+        store.add(SecurityInfo.newPreSharedKeyInfo("endpoint", IDENTITY, KEY));
+        PskTlsHandler handler = new PskTlsHandler(store);
+        EmbeddedChannel channel = new EmbeddedChannel(handler);
+        try {
+            TlsClientProtocol client = new TlsClientProtocol();
+            client.connect(
+                    new PSKTlsClient(new BcTlsCrypto(new SecureRandom()), new BasicTlsPSKIdentity(IDENTITY, KEY)) {
+                        @Override
+                        protected int[] getSupportedCipherSuites() {
+                            return PskTls.cipherSuites();
+                        }
+
+                        @Override
+                        protected ProtocolVersion[] getSupportedVersions() {
+                            return PskTls.versions();
+                        }
+                    });
+            assertThrows(Exception.class, () -> {
+                for (int step = 0; step < 20 && !client.isConnected(); step++) {
+                    byte[] records = new byte[client.getAvailableOutputBytes()];
+                    client.readOutput(records, 0, records.length);
+                    channel.writeInbound(Unpooled.wrappedBuffer(records));
+                    ByteBuf output;
+                    while ((output = channel.readOutbound()) != null) {
+                        byte[] encrypted = new byte[output.readableBytes()];
+                        output.readBytes(encrypted);
+                        output.release();
+                        client.offerInput(encrypted);
+                    }
+                }
+            });
+            assertThrows(IllegalStateException.class, handler::getTransportContext);
+            org.junit.jupiter.api.Assertions.assertFalse(channel.isActive());
+        } finally {
+            channel.finishAndReleaseAll();
+        }
+    }
+
 }

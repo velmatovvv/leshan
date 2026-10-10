@@ -23,6 +23,9 @@ import static org.eclipse.leshan.integration.tests.util.Credentials.trustedCerti
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 
 import java.security.cert.Certificate;
 import java.util.List;
@@ -31,16 +34,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
+import org.eclipse.leshan.client.endpoint.ClientEndpointToolbox;
+import org.eclipse.leshan.client.notification.NotificationManager;
+import org.eclipse.leshan.client.request.DownlinkRequestReceiver;
+import org.eclipse.leshan.client.resource.LwM2mObjectTree;
+import org.eclipse.leshan.client.servers.LwM2mServer;
 import org.eclipse.leshan.client.servers.ServerInfo;
 import org.eclipse.leshan.core.endpoint.Protocol;
 import org.eclipse.leshan.core.observation.CompositeObservation;
 import org.eclipse.leshan.core.observation.SingleObservation;
 import org.eclipse.leshan.core.request.CancelObservationRequest;
 import org.eclipse.leshan.core.request.ContentFormat;
+import org.eclipse.leshan.core.request.DownlinkRequest;
 import org.eclipse.leshan.core.request.ObserveCompositeRequest;
 import org.eclipse.leshan.core.request.ObserveRequest;
 import org.eclipse.leshan.core.request.ReadRequest;
 import org.eclipse.leshan.core.request.WriteRequest;
+import org.eclipse.leshan.core.response.LwM2mResponse;
+import org.eclipse.leshan.core.response.SendableResponse;
 import org.eclipse.leshan.integration.tests.util.LeshanTestClient;
 import org.eclipse.leshan.integration.tests.util.LeshanTestClientBuilder;
 import org.eclipse.leshan.integration.tests.util.LeshanTestServer;
@@ -74,15 +85,42 @@ public class ObserveCancellationTcpTest {
 
     private Service<CoapRequest, CoapResponse> instrument(Service<CoapRequest, CoapResponse> router) {
         return request -> {
-            if (Boolean.TRUE.equals(request.getTransContext(LwM2mKeys.LESHAN_NOTIFICATION))) {
-                notificationsBuilt.incrementAndGet();
-            }
             return router.apply(request).thenApply(response -> {
                 if (Integer.valueOf(1).equals(request.options().getObserve())) {
                     cancellations.add(request);
                 }
                 return response;
             });
+        };
+    }
+
+    private NotificationManager instrument(NotificationManager manager) {
+        NotificationManager instrumented = spy(manager);
+        doAnswer(invocation -> {
+            notificationsBuilt.incrementAndGet();
+            return invocation.callRealMethod();
+        }).when(instrumented).notificationTriggered(any(), any(), any());
+        return instrumented;
+    }
+
+    private DownlinkRequestReceiver instrument(DownlinkRequestReceiver delegate) {
+        return new DownlinkRequestReceiver() {
+            @Override
+            public <T extends LwM2mResponse> SendableResponse<T> requestReceived(LwM2mServer server,
+                    DownlinkRequest<T> request) {
+                Object coap = request.getCoapRequest();
+                if (coap instanceof CoapRequest
+                        && Boolean.TRUE.equals(((CoapRequest) coap).getTransContext(LwM2mKeys.LESHAN_NOTIFICATION))) {
+                    notificationsBuilt.incrementAndGet();
+                }
+                return delegate.requestReceived(server, request);
+            }
+
+            @Override
+            public void onError(LwM2mServer server, Exception error,
+                    Class<? extends DownlinkRequest<? extends LwM2mResponse>> type) {
+                delegate.onError(server, error, type);
+            }
         };
     }
 
@@ -99,6 +137,12 @@ public class ObserveCancellationTcpTest {
         if (mode.equals("TCP")) {
             cb.with(new JavaCoapTcpClientEndpointsProvider() {
                 @Override
+                public void init(LwM2mObjectTree tree, DownlinkRequestReceiver receiver, NotificationManager manager,
+                        ClientEndpointToolbox toolbox) {
+                    super.init(tree, instrument(receiver), instrument(manager), toolbox);
+                }
+
+                @Override
                 protected CoapServer createCoapServer(ServerInfo info, Service<CoapRequest, CoapResponse> router,
                         List<Certificate> trustStore) {
                     return super.createCoapServer(info, instrument(router), trustStore);
@@ -106,6 +150,12 @@ public class ObserveCancellationTcpTest {
             });
         } else {
             cb.with(new JavaCoapsTcpClientEndpointsProvider() {
+                @Override
+                public void init(LwM2mObjectTree tree, DownlinkRequestReceiver receiver, NotificationManager manager,
+                        ClientEndpointToolbox toolbox) {
+                    super.init(tree, instrument(receiver), instrument(manager), toolbox);
+                }
+
                 @Override
                 protected CoapServer createCoapServer(ServerInfo info, Service<CoapRequest, CoapResponse> router,
                         List<Certificate> trustStore) {
@@ -185,4 +235,36 @@ public class ObserveCancellationTcpTest {
         assertTrue(server.send(registration, new WriteRequest(3, 0, 15, "Europe/London")).isSuccess());
         assertEquals(0, notificationsBuilt.get());
     }
+
+    @ParameterizedTest
+    @MethodSource("modes")
+    public void disconnectClearsSingleAndCompositeObservationsOnBothPeers(String mode) throws Exception {
+        start(mode);
+        assertNotNull(server.send(registration, new ObserveRequest(3, 0, 15)).getObservation());
+        assertNotNull(server.send(registration,
+                new ObserveCompositeRequest(ContentFormat.SENML_CBOR, ContentFormat.SENML_CBOR, "/3/0/15", "/3/0/14"))
+                .getObservation());
+        assertEquals(2, server.getObservationService().getObservations(registration).size());
+        client.stop(false);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (!server.getObservationService().getObservations(registration).isEmpty()
+                && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertTrue(server.getObservationService().getObservations(registration).isEmpty(),
+                "Closing TCP must remove server-side observation state before re-registration");
+        client.start();
+        client.waitForRegistrationTo(server);
+        registration = server.getRegistrationFor(client);
+        assertTrue(server.send(registration, new WriteRequest(3, 0, 15, "Europe/London")).isSuccess());
+        assertEquals(0, notificationsBuilt.get(), "Client must not reuse observations from the old connection");
+        assertNotNull(server.send(registration, new ObserveRequest(3, 0, 15)).getObservation());
+        assertTrue(server.send(registration, new WriteRequest(3, 0, 15, "Europe/Paris")).isSuccess());
+        deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (notificationsBuilt.get() == 0 && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        assertEquals(1, notificationsBuilt.get());
+    }
+
 }

@@ -205,7 +205,7 @@ public class JavaCoapServerEndpoint implements LwM2mServerEndpoint {
 
         future.whenComplete((r, e) -> {
             // Cancel TimeoutTask just above when future is complete
-            if (e == null && timeoutTask != null && !timeoutTask.isDone()) {
+            if (timeoutTask != null && !timeoutTask.isDone()) {
                 timeoutTask.cancel(false);
             }
         });
@@ -262,6 +262,18 @@ public class JavaCoapServerEndpoint implements LwM2mServerEndpoint {
         } catch (RuntimeException e) {
             LOG.debug("Unable to send cancellation of observation {}", observation, e);
         }
+    }
+
+    public void stop() {
+        for (CompletableFuture<? extends LwM2mResponse> request : ongoingRequests.values()) {
+            request.cancel(false);
+        }
+        ongoingRequests.clear();
+    }
+
+    public void destroy() {
+        stop();
+        executor.shutdownNow();
     }
 
     private static String getFloorKey(String sessionID) {

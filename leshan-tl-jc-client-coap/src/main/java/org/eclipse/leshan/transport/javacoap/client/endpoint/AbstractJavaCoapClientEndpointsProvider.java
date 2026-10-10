@@ -16,6 +16,7 @@
 package org.eclipse.leshan.transport.javacoap.client.endpoint;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.security.cert.Certificate;
 import java.util.Arrays;
 import java.util.Collection;
@@ -192,6 +193,10 @@ public abstract class AbstractJavaCoapClientEndpointsProvider implements LwM2mCl
         observersManager.init(coapServer);
         lwm2mEndpoint = new JavaCoapClientEndpoint(supportedProtocol, endpointDescription, coapServer,
                 messagetranslator, toolbox, objectTree.getModel());
+    }
+
+    protected void removeObservationsByPeer(InetSocketAddress address) {
+        observersManager.removeByPeer(address);
     }
 
     protected abstract CoapServer createCoapServer(ServerInfo serverInfo, Service<CoapRequest, CoapResponse> router,

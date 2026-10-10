@@ -49,6 +49,7 @@ import com.mbed.coap.packet.Opaque;
 import com.mbed.coap.server.CoapServer;
 import com.mbed.coap.server.TcpCoapServer;
 import com.mbed.coap.server.filter.TokenGeneratorFilter;
+import com.mbed.coap.transport.CoapTcpListener;
 import com.mbed.coap.transport.TransportContext;
 import com.mbed.coap.utils.Service;
 
@@ -66,10 +67,15 @@ public class JavaCoapsTcpClientEndpointsProvider extends AbstractJavaCoapClientE
             List<Certificate> trustStore) {
 
         if (serverInfo.secureMode == SecurityMode.PSK) {
-            return TcpCoapServer.builder()
-                    .transport(
-                            new PskSocketClientTransport(serverInfo.getAddress(), serverInfo.pskId, serverInfo.pskKey))
-                    .blockSize(BlockSize.S_1024_BERT).outboundFilter(TokenGeneratorFilter.RANDOM).route(router).build();
+            return TcpCoapServer.builder().transport(
+                    new PskSocketClientTransport(serverInfo.getAddress(), serverInfo.pskId, serverInfo.pskKey) {
+                        @Override
+                        public void setListener(CoapTcpListener listener) {
+                            super.setListener(new ObservationCleanupListener(listener,
+                                    JavaCoapsTcpClientEndpointsProvider.this::removeObservationsByPeer));
+                        }
+                    }).blockSize(BlockSize.S_1024_BERT).outboundFilter(TokenGeneratorFilter.RANDOM).route(router)
+                    .build();
         }
 
         // Create SSL Socket Factory using right credentials.
@@ -93,6 +99,12 @@ public class JavaCoapsTcpClientEndpointsProvider extends AbstractJavaCoapClientE
 
         return TcpCoapServer.builder()
                 .transport(new SSLSocketClientTransport(serverInfo.getAddress(), tlsContext.getSocketFactory(), true) {
+
+                    @Override
+                    public void setListener(CoapTcpListener listener) {
+                        super.setListener(new ObservationCleanupListener(listener,
+                                JavaCoapsTcpClientEndpointsProvider.this::removeObservationsByPeer));
+                    }
 
                     @Override
                     public CompletableFuture<CoapPacket> receive() {

@@ -69,6 +69,14 @@ public class ObserversManager implements Filter.SimpleFilter<CoapRequest, CoapRe
         return null;
     }
 
+    public void removeByPeer(InetSocketAddress address) {
+        for (CoapRequest request : observersStore) {
+            if (address.equals(request.getPeerAddress())) {
+                observersStore.remove(request);
+            }
+        }
+    }
+
     public boolean contains(CoapRequest req) {
         return observersStore.contains(req);
     }

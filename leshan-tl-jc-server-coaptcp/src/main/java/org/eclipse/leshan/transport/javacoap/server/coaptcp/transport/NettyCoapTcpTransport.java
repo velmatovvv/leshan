@@ -23,7 +23,9 @@ import java.net.SocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -46,6 +48,9 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.group.ChannelGroup;
+import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -54,6 +59,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.concurrent.EventExecutor;
 
 public class NettyCoapTcpTransport implements CoapTcpTransport {
 
@@ -61,6 +67,12 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
 
     private final InetSocketAddress localAddress;
     private volatile Channel mainChannel;
+    private volatile InetSocketAddress boundAddress;
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
+    private volatile ChannelGroup allChannels;
+    private Consumer<InetSocketAddress> connectionClosedListener = address -> {
+    };
     private final ConcurrentMap<SocketAddress, Channel> activeChannels = new ConcurrentHashMap<>();
     private volatile CoapTcpListener listener;
     private CompletableFuture<CoapPacket> receivePromise = new CompletableFuture<>();
@@ -84,24 +96,46 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
 
     @Override
     public synchronized void start() throws IOException {
-        // Init transport
+        if (bossGroup != null || workerGroup != null) {
+            throw new IllegalStateException("TCP transport is already started");
+        }
         ServerBootstrap bootstrap = new ServerBootstrap();
-        NioEventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        NioEventLoopGroup workerGroup = new NioEventLoopGroup(1);
+        bossGroup = new NioEventLoopGroup(1);
+        workerGroup = new NioEventLoopGroup(1);
+        allChannels = new DefaultChannelGroup(workerGroup.next(), true);
         bootstrap.group(bossGroup, workerGroup) //
                 .channel(NioServerSocketChannel.class) //
-                .childHandler(new ChannelRegistry()) //
+                .childHandler(new ChannelRegistry(allChannels)) //
                 .option(ChannelOption.SO_BACKLOG, 100) //
                 .option(ChannelOption.AUTO_READ, true) //
                 .childOption(ChannelOption.SO_KEEPALIVE, true);
 
         // start it
-        mainChannel = bootstrap.bind(localAddress).syncUninterruptibly().channel();
+        try {
+            mainChannel = bootstrap.bind(localAddress).syncUninterruptibly().channel();
+            boundAddress = (InetSocketAddress) mainChannel.localAddress();
+        } catch (Exception e) {
+            bossGroup.shutdownGracefully(0, 5, TimeUnit.SECONDS).syncUninterruptibly();
+            workerGroup.shutdownGracefully(0, 5, TimeUnit.SECONDS).syncUninterruptibly();
+            bossGroup = null;
+            workerGroup = null;
+            allChannels = null;
+            throw new IOException("Unable to bind TCP transport", e);
+        }
     }
 
     private class ChannelRegistry extends ChannelInitializer<SocketChannel> {
+        private final ChannelGroup channels;
+
+        ChannelRegistry(ChannelGroup channels) {
+            this.channels = channels;
+        }
+
         @Override
         protected void initChannel(SocketChannel ch) throws Exception {
+
+            // Track sockets before TLS authentication so stop/revocation can close pending handshakes too.
+            channels.add(ch);
 
             // Handler order:
             // 0. Register/unregister new channel: all messages can only be sent
@@ -156,7 +190,7 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             if (ctx.channel().remoteAddress() != null) {
-                activeChannels.remove(ctx.channel().remoteAddress());
+                activeChannels.remove(ctx.channel().remoteAddress(), ctx.channel());
             } else {
                 // it seems that sometime remoteAddress is null, I don't know why ...
                 LOGGER.warn("Channel Remote Address is null");
@@ -196,11 +230,17 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
 //            if (tansportContext == null)
 //                throw new IllegalStateException("transport context should not be null");
 
-            if (listener != null
-                    // Not clear what is the consequence but it seems that remote addresse can be null :
-                    // https://github.com/netty/netty/issues/8501
-                    && ctx.channel().remoteAddress() != null)
-                listener.onDisconnected((InetSocketAddress) ctx.channel().remoteAddress());
+            if (ctx.channel().remoteAddress() != null
+                    && ctx.channel().attr(TransportContextHandler.TRANSPORT_CONTEXT_ATTR).get() != null) {
+                InetSocketAddress address = (InetSocketAddress) ctx.channel().remoteAddress();
+                try {
+                    connectionClosedListener.accept(address);
+                } finally {
+                    if (listener != null) {
+                        listener.onDisconnected(address);
+                    }
+                }
+            }
 
             super.channelInactive(ctx);
         }
@@ -235,8 +275,61 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
 
     @Override
     public void stop() {
-        mainChannel.close();
-        mainChannel.closeFuture().syncUninterruptibly();
+        Channel server;
+        ChannelGroup channels;
+        EventLoopGroup boss;
+        EventLoopGroup worker;
+        synchronized (this) {
+            server = mainChannel;
+            channels = allChannels;
+            boss = bossGroup;
+            worker = workerGroup;
+            mainChannel = null;
+            allChannels = null;
+            bossGroup = null;
+            workerGroup = null;
+        }
+        if (boss == null && worker == null) {
+            return;
+        }
+        // CoAP may stop itself on an event-loop callback: never block that thread waiting for itself.
+        boolean inEventLoop = inEventLoop(boss) || inEventLoop(worker);
+        if (server != null) {
+            if (inEventLoop) {
+                server.close();
+            } else {
+                server.close().syncUninterruptibly();
+            }
+        }
+        if (channels != null) {
+            if (inEventLoop) {
+                channels.close();
+            } else {
+                channels.close().syncUninterruptibly();
+            }
+        }
+        activeChannels.clear();
+        io.netty.util.concurrent.Future<?> bossStopped = boss.shutdownGracefully(0, 5, TimeUnit.SECONDS);
+        io.netty.util.concurrent.Future<?> workerStopped = worker.shutdownGracefully(0, 5, TimeUnit.SECONDS);
+        if (!inEventLoop) {
+            bossStopped.syncUninterruptibly();
+            workerStopped.syncUninterruptibly();
+        }
+    }
+
+    private static boolean inEventLoop(EventLoopGroup group) {
+        if (group != null) {
+            for (EventExecutor executor : group) {
+                if (executor.inEventLoop()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public void setConnectionClosedListener(Consumer<InetSocketAddress> listener) {
+        this.connectionClosedListener = listener;
     }
 
     @Override
@@ -256,7 +349,11 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
     }
 
     public void closeConnections(Predicate<Channel> filter) {
-        for (Channel channel : activeChannels.values()) {
+        ChannelGroup channels = allChannels;
+        if (channels == null) {
+            return;
+        }
+        for (Channel channel : channels) {
             if (filter.test(channel)) {
                 SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
 
@@ -282,7 +379,7 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
 
     @Override
     public InetSocketAddress getLocalSocketAddress() {
-        return (InetSocketAddress) mainChannel.localAddress();
+        return boundAddress;
     }
 
     public Channel getChannel() {

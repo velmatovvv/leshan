@@ -19,6 +19,8 @@ import static org.eclipse.leshan.integration.tests.util.assertion.Assertions.ass
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.util.concurrent.TimeUnit;
 
@@ -32,20 +34,23 @@ import org.eclipse.leshan.integration.tests.util.LeshanTestServerBuilder;
 import org.eclipse.leshan.server.registration.Registration;
 import org.eclipse.leshan.servers.security.InMemorySecurityStore;
 import org.eclipse.leshan.servers.security.SecurityInfo;
+import org.eclipse.leshan.servers.security.SecurityStoreListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class PskTlsTest {
     private static final String IDENTITY = "tls-psk-идентификатор";
     private static final byte[] KEY = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+    private InMemorySecurityStore securityStore;
     private LeshanTestServer server;
     private LeshanTestClient client;
 
     @BeforeEach
     public void startServer() {
-        server = new LeshanTestServerBuilder(Protocol.COAPS_TCP).with("java-coap").with(new InMemorySecurityStore())
-                .build();
+        securityStore = spy(new InMemorySecurityStore());
+        server = new LeshanTestServerBuilder(Protocol.COAPS_TCP).with("java-coap").with(securityStore).build();
         server.start();
         client = new LeshanTestClientBuilder(Protocol.COAPS_TCP).with("java-coap").connectingTo(server)
                 .usingPsk(IDENTITY, KEY).build();
@@ -59,6 +64,15 @@ public class PskTlsTest {
         if (server != null) {
             server.destroy();
         }
+    }
+
+    @Test
+    public void destroyDetachesSecurityStoreListener() {
+        ArgumentCaptor<SecurityStoreListener> listener = ArgumentCaptor.forClass(SecurityStoreListener.class);
+        verify(securityStore).addListener(listener.capture());
+        server.destroy();
+        server = null;
+        verify(securityStore).removeListener(listener.getValue());
     }
 
     @Test

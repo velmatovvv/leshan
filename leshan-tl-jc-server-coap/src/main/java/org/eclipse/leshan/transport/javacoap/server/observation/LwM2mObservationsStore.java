@@ -15,6 +15,7 @@
  *******************************************************************************/
 package org.eclipse.leshan.transport.javacoap.server.observation;
 
+import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -113,6 +114,22 @@ public class LwM2mObservationsStore implements ObservationsStore {
         }
 
         return ObservationUtil.getPath(observation);
+    }
+
+    /** Remove only observations for this endpoint and the disconnected peer. */
+    public void removeByPeer(InetSocketAddress address) {
+        Registration registration = store.getRegistrationByAdress(address);
+        if (registration == null) {
+            return;
+        }
+        for (Observation observation : store.getObservations(registration.getId())) {
+            if (endpointUriProvider.getEndpointUri().equals(observation.getId().getEndpointUri())) {
+                Observation removed = store.removeObservation(registration.getId(), observation.getId());
+                if (removed != null) {
+                    notificationReceiver.cancelled(removed);
+                }
+            }
+        }
     }
 
     @Override

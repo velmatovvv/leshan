@@ -31,6 +31,7 @@ import com.mbed.coap.packet.CoapResponse;
 import com.mbed.coap.server.CoapServer;
 import com.mbed.coap.server.TcpCoapServer;
 import com.mbed.coap.server.filter.TokenGeneratorFilter;
+import com.mbed.coap.transport.CoapTcpListener;
 import com.mbed.coap.transport.javassl.SocketClientTransport;
 import com.mbed.coap.utils.Service;
 
@@ -45,7 +46,13 @@ public class JavaCoapTcpClientEndpointsProvider extends AbstractJavaCoapClientEn
     protected CoapServer createCoapServer(ServerInfo serverInfo, Service<CoapRequest, CoapResponse> router,
             List<Certificate> trustStore) {
         return TcpCoapServer.builder() ///
-                .transport(new SocketClientTransport(serverInfo.getAddress(), SocketFactory.getDefault(), true)) //
+                .transport(new SocketClientTransport(serverInfo.getAddress(), SocketFactory.getDefault(), true) {
+                    @Override
+                    public void setListener(CoapTcpListener listener) {
+                        super.setListener(new ObservationCleanupListener(listener,
+                                JavaCoapTcpClientEndpointsProvider.this::removeObservationsByPeer));
+                    }
+                }) //
                 .blockSize(BlockSize.S_1024_BERT) //
                 .outboundFilter(TokenGeneratorFilter.RANDOM)//
                 .route(router) //

@@ -130,6 +130,7 @@ public abstract class AbstractJavaCoapServerEndpointsProvider implements LwM2mSe
         try {
             coapServer.start();
         } catch (IOException e) {
+            coapServer.stop();
             throw new IllegalStateException("Unable to start java-coap endpoint", e);
         }
     }
@@ -140,11 +141,21 @@ public abstract class AbstractJavaCoapServerEndpointsProvider implements LwM2mSe
         // but in java-coap : There is no restart after stop, need to create new instance to start again.
         // I don't know if we should remove stop from Leshan API ?
         coapServer.stop();
+        if (lwm2mEndpoint != null) {
+            lwm2mEndpoint.stop();
+        }
     }
 
     @Override
     public void destroy() {
-        // TODO there is no destroy, so we just stop ?
-        coapServer.stop();
+        try {
+            if (coapServer != null) {
+                coapServer.stop();
+            }
+        } finally {
+            if (lwm2mEndpoint != null) {
+                lwm2mEndpoint.destroy();
+            }
+        }
     }
 }
