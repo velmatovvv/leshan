@@ -33,6 +33,7 @@ import javax.net.ssl.X509TrustManager;
 
 import org.eclipse.leshan.client.security.CertificateVerifierFactory;
 import org.eclipse.leshan.client.servers.ServerInfo;
+import org.eclipse.leshan.core.SecurityMode;
 import org.eclipse.leshan.core.endpoint.Protocol;
 import org.eclipse.leshan.core.security.jsse.LwM2mX509TrustManager;
 import org.eclipse.leshan.transport.javacoap.SingleX509KeyManager;
@@ -63,6 +64,13 @@ public class JavaCoapsTcpClientEndpointsProvider extends AbstractJavaCoapClientE
     @Override
     protected CoapServer createCoapServer(ServerInfo serverInfo, Service<CoapRequest, CoapResponse> router,
             List<Certificate> trustStore) {
+
+        if (serverInfo.secureMode == SecurityMode.PSK) {
+            return TcpCoapServer.builder()
+                    .transport(
+                            new PskSocketClientTransport(serverInfo.getAddress(), serverInfo.pskId, serverInfo.pskKey))
+                    .blockSize(BlockSize.S_1024_BERT).outboundFilter(TokenGeneratorFilter.RANDOM).route(router).build();
+        }
 
         // Create SSL Socket Factory using right credentials.
         SSLContext tlsContext;

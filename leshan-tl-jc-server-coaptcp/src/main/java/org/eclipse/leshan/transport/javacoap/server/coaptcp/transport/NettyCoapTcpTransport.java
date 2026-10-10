@@ -40,6 +40,7 @@ import com.mbed.coap.transport.TransportContext;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
@@ -77,6 +78,10 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
         this.contextMatcher = contextMatcher;
     }
 
+    protected ChannelHandler createTlsHandler(SocketChannel channel) {
+        return sslContext == null ? null : sslContext.newHandler(channel.alloc());
+    }
+
     @Override
     public synchronized void start() throws IOException {
         // Init transport
@@ -106,8 +111,9 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
             // 3. Stream-to-message decoder
             // 4. Hand-off decoded messages to CoAP stack
             // 5. Close connections on errors.
-            if (sslContext != null) {
-                ch.pipeline().addFirst(sslContext.newHandler(ch.alloc()));
+            ChannelHandler tlsHandler = createTlsHandler(ch);
+            if (tlsHandler != null) {
+                ch.pipeline().addFirst(tlsHandler);
                 ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                     @Override
                     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
@@ -253,6 +259,11 @@ public class NettyCoapTcpTransport implements CoapTcpTransport {
         for (Channel channel : activeChannels.values()) {
             if (filter.test(channel)) {
                 SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
+
+                if (sslHandler == null) {
+                    channel.close();
+                    continue;
+                }
 
                 // Invalidate TLS session to not allow to resume
                 sslHandler.engine().getSession().invalidate();

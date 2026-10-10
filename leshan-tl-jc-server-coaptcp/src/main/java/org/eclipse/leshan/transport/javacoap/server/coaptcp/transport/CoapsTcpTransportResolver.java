@@ -33,6 +33,14 @@ public class CoapsTcpTransportResolver extends CoapTcpTransportResolver {
 
     @Override
     public TransportContext apply(Channel channel) {
+        PskTlsHandler pskHandler = channel.pipeline().get(PskTlsHandler.class);
+        if (pskHandler != null) {
+            TransportContext psk = pskHandler.getTransportContext();
+            return super.apply(channel)
+                    .with(TlsTransportContextKeys.PRINCIPAL, psk.get(TlsTransportContextKeys.PRINCIPAL))
+                    .with(TlsTransportContextKeys.TLS_SESSION_ID, psk.get(TlsTransportContextKeys.TLS_SESSION_ID))
+                    .with(TlsTransportContextKeys.CIPHER_SUITE, psk.get(TlsTransportContextKeys.CIPHER_SUITE));
+        }
         // Get Session
         SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
         if (sslHandler == null) {

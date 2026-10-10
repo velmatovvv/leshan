@@ -22,6 +22,7 @@ import javax.security.auth.x500.X500Principal;
 
 import org.eclipse.leshan.core.peer.IpPeer;
 import org.eclipse.leshan.core.peer.LwM2mPeer;
+import org.eclipse.leshan.core.peer.PskIdentity;
 import org.eclipse.leshan.core.peer.X509Identity;
 import org.eclipse.leshan.core.security.certificate.util.X509CertUtil;
 
@@ -33,6 +34,9 @@ public class DefaultTlsIdentityHandler extends DefaultCoapIdentityHandler {
     protected LwM2mPeer getIdentity(InetSocketAddress address, TransportContext context) {
         Principal principal = context.get(TlsTransportContextKeys.PRINCIPAL);
         if (principal != null) {
+            if (principal instanceof PskPrincipal) {
+                return new IpPeer(address, new PskIdentity(principal.getName()));
+            }
             if (principal instanceof X500Principal) {
                 // Extract common name
                 String x509CommonName = X509CertUtil.extractCN(principal.getName());
@@ -49,6 +53,10 @@ public class DefaultTlsIdentityHandler extends DefaultCoapIdentityHandler {
     @Override
     public TransportContext createTransportContext(LwM2mPeer client, boolean allowConnectionInitiation) {
         Principal peerIdentity = null;
+        if (client.getIdentity() instanceof PskIdentity) {
+            return TransportContext.of(TlsTransportContextKeys.PRINCIPAL,
+                    new PskPrincipal(((PskIdentity) client.getIdentity()).getPskIdentity()));
+        }
         if (client.getIdentity() instanceof X509Identity) {
             /* simplify distinguished name to CN= part */
             peerIdentity = new X500Principal("CN=" + ((X509Identity) client.getIdentity()).getX509CommonName());

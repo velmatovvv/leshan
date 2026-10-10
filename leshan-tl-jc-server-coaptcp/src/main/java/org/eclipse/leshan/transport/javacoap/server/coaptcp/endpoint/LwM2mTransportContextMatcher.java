@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import javax.security.auth.x500.X500Principal;
 
+import org.eclipse.leshan.transport.javacoap.identity.PskPrincipal;
 import org.eclipse.leshan.transport.javacoap.identity.TlsTransportContextKeys;
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.DefaultTransportContextMatcher;
 import org.slf4j.Logger;
@@ -34,7 +35,10 @@ public class LwM2mTransportContextMatcher extends DefaultTransportContextMatcher
     @Override
     protected boolean matches(Key<?> key, Object packetValue, Object channelValue) {
         if (key.equals(TlsTransportContextKeys.PRINCIPAL)) {
-            if (packetValue instanceof X500Principal || channelValue instanceof X500Principal) {
+            if (packetValue instanceof PskPrincipal || channelValue instanceof PskPrincipal) {
+                return packetValue.equals(channelValue);
+            }
+            if (packetValue instanceof X500Principal && channelValue instanceof X500Principal) {
                 try {
                     String requestedCommonName = extractCN(((X500Principal) packetValue).getName());
                     String availableCommonName = extractCN(((X500Principal) channelValue).getName());

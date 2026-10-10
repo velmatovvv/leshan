@@ -37,9 +37,11 @@ import org.eclipse.leshan.servers.security.SecurityStoreListener;
 import org.eclipse.leshan.servers.security.ServerSecurityInfo;
 import org.eclipse.leshan.transport.javacoap.SingleX509KeyManager;
 import org.eclipse.leshan.transport.javacoap.identity.DefaultTlsIdentityHandler;
+import org.eclipse.leshan.transport.javacoap.identity.PskPrincipal;
 import org.eclipse.leshan.transport.javacoap.identity.TlsTransportContextKeys;
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.CoapsTcpTransportResolver;
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.NettyCoapTcpTransport;
+import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.PskTlsHandler;
 import org.eclipse.leshan.transport.javacoap.server.coaptcp.transport.TransportContextHandler;
 import org.eclipse.leshan.transport.javacoap.server.endpoint.AbstractJavaCoapServerEndpointsProvider;
 
@@ -55,6 +57,8 @@ import com.mbed.coap.server.observe.ObservationsStore;
 import com.mbed.coap.transport.TransportContext;
 import com.mbed.coap.utils.Service;
 
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -62,9 +66,17 @@ import io.netty.util.Attribute;
 
 public class JavaCoapsTcpServerEndpointsProvider extends AbstractJavaCoapServerEndpointsProvider {
 
+    private final boolean pskOnly;
+
     public JavaCoapsTcpServerEndpointsProvider(InetSocketAddress localAddress) {
+        this(localAddress, false);
+    }
+
+    /** Enable a PSK-only TLS endpoint even when server certificates are configured. */
+    public JavaCoapsTcpServerEndpointsProvider(InetSocketAddress localAddress, boolean pskOnly) {
         super(Protocol.COAPS_TCP, "CoAP over TLS experimental endpoint based on java-coap and netty libraries",
                 localAddress, new DefaultTlsIdentityHandler());
+        this.pskOnly = pskOnly;
     }
 
     @Override
@@ -73,38 +85,52 @@ public class JavaCoapsTcpServerEndpointsProvider extends AbstractJavaCoapServerE
             NotificationsReceiver notificationReceiver, ObservationsStore observationsStore) {
 
         // Create SSL Handler with right Credentials
-        SslContext sslContext;
-        try {
-            // Create context
-            X509KeyManager keys = new SingleX509KeyManager(serverSecurityInfo.getPrivateKey(),
-                    serverSecurityInfo.getCertificateChain());
-            X509TrustManager trustManger = new LwM2mX509TrustManager(new DefaultCertificateVerifier(
-                    Arrays.asList(X509CertUtil.asX509Certificates(serverSecurityInfo.getTrustedCertificates()))) {
+        SslContext sslContext = null;
+        boolean usePsk = pskOnly || serverSecurityInfo == null || serverSecurityInfo.getPrivateKey() == null;
+        if (!usePsk) {
+            try {
+                // Create context
+                X509KeyManager keys = new SingleX509KeyManager(serverSecurityInfo.getPrivateKey(),
+                        serverSecurityInfo.getCertificateChain());
+                X509TrustManager trustManger = new LwM2mX509TrustManager(new DefaultCertificateVerifier(
+                        Arrays.asList(X509CertUtil.asX509Certificates(serverSecurityInfo.getTrustedCertificates()))) {
+                    @Override
+                    protected void validateSubject(InetSocketAddress peerSocket,
+                            X509Certificate receivedServerCertificate) throws CertificateException {
+                        // Do not validate subject at server side.
+                    }
+                });
+
+                sslContext = SslContextBuilder //
+                        .forServer(keys) //
+                        .startTls(false) //
+                        .trustManager(trustManger) //
+                        .protocols("TLSv1.2") //
+                        .clientAuth(ClientAuth.REQUIRE) //
+                        .build();
+
+            } catch (SSLException | CertificateException e) {
+                throw new IllegalStateException("Unable to create tls endpoint point", e);
+            }
+
+            if (sslContext == null) {
+                throw new IllegalStateException("Unable to create tls endpoint point : sslcontext must not be null");
+            }
+
+        }
+        NettyCoapTcpTransport transport;
+        if (usePsk) {
+            transport = new NettyCoapTcpTransport(localAddress, new CoapsTcpTransportResolver(),
+                    new LwM2mTransportContextMatcher(), null) {
                 @Override
-                protected void validateSubject(InetSocketAddress peerSocket, X509Certificate receivedServerCertificate)
-                        throws CertificateException {
-                    // Do not validate subject at server side.
+                protected ChannelHandler createTlsHandler(SocketChannel channel) {
+                    return new PskTlsHandler(securityStore);
                 }
-            });
-
-            sslContext = SslContextBuilder //
-                    .forServer(keys) //
-                    .startTls(false) //
-                    .trustManager(trustManger) //
-                    .protocols("TLSv1.2") //
-                    .clientAuth(ClientAuth.REQUIRE) //
-                    .build();
-
-        } catch (SSLException | CertificateException e) {
-            throw new IllegalStateException("Unable to create tls endpoint point", e);
+            };
+        } else {
+            transport = new NettyCoapTcpTransport(localAddress, new CoapsTcpTransportResolver(),
+                    new LwM2mTransportContextMatcher(), sslContext);
         }
-
-        if (sslContext == null) {
-            throw new IllegalStateException("Unable to create tls endpoint point : sslcontext must not be null");
-        }
-
-        NettyCoapTcpTransport transport = new NettyCoapTcpTransport(localAddress, new CoapsTcpTransportResolver(),
-                new LwM2mTransportContextMatcher(), sslContext);
 
         createAndAttachConnectionCleaner(transport, securityStore);
 
@@ -132,11 +158,15 @@ public class JavaCoapsTcpServerEndpointsProvider extends AbstractJavaCoapServerE
 
                     transport.closeConnections(channel -> {
                         Attribute<TransportContext> attr = channel.attr(TransportContextHandler.TRANSPORT_CONTEXT_ATTR);
-                        if (attr != null) {
+                        if (attr != null && attr.get() != null) {
                             Principal principal = attr.get().get(TlsTransportContextKeys.PRINCIPAL);
                             if (principal != null) {
                                 for (SecurityInfo info : infos) {
                                     if (info != null) {
+                                        if (principal instanceof PskPrincipal
+                                                && principal.getName().equals(info.getPskIdentity())) {
+                                            return true;
+                                        }
                                         // x509
                                         if (info.useX509Cert() && principal instanceof X500Principal) {
                                             // Extract common name

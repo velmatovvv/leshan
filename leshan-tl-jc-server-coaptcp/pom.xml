@@ -31,6 +31,11 @@ Contributors:
 
   <dependencies>
     <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.eclipse.leshan</groupId>
       <artifactId>leshan-lwm2m-server</artifactId>
     </dependency>
