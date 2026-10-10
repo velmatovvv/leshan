@@ -93,7 +93,7 @@ public abstract class AbstractJavaCoapServerEndpointsProvider implements LwM2mSe
         );
 
         lwm2mEndpoint = new JavaCoapServerEndpoint(supportedProtocol, endpointDescription, coapServer,
-                new ServerCoapMessageTranslator(identityHandler), toolbox);
+                new ServerCoapMessageTranslator(identityHandler), toolbox, server.getRegistrationStore());
 
         endpointUriProvider.setEndpoint(lwm2mEndpoint);
     }

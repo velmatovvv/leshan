@@ -31,7 +31,11 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.leshan.core.endpoint.EndpointUri;
 import org.eclipse.leshan.core.endpoint.Protocol;
+import org.eclipse.leshan.core.observation.CompositeObservation;
 import org.eclipse.leshan.core.observation.Observation;
+import org.eclipse.leshan.core.observation.SingleObservation;
+import org.eclipse.leshan.core.request.CancelCompositeObservationRequest;
+import org.eclipse.leshan.core.request.CancelObservationRequest;
 import org.eclipse.leshan.core.request.DownlinkDeviceManagementRequest;
 import org.eclipse.leshan.core.request.exception.RequestCanceledException;
 import org.eclipse.leshan.core.request.exception.SendFailedException;
@@ -44,7 +48,11 @@ import org.eclipse.leshan.core.util.Validate;
 import org.eclipse.leshan.server.endpoint.LwM2mServerEndpoint;
 import org.eclipse.leshan.server.endpoint.ServerEndpointToolbox;
 import org.eclipse.leshan.server.profile.ClientProfile;
+import org.eclipse.leshan.server.registration.Registration;
+import org.eclipse.leshan.server.registration.RegistrationStore;
 import org.eclipse.leshan.server.request.LowerLayerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.mbed.coap.exception.CoapTimeoutException;
 import com.mbed.coap.packet.CoapRequest;
@@ -52,6 +60,9 @@ import com.mbed.coap.packet.CoapResponse;
 import com.mbed.coap.server.CoapServer;
 
 public class JavaCoapServerEndpoint implements LwM2mServerEndpoint {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JavaCoapServerEndpoint.class);
+    private final RegistrationStore registrationStore;
 
     private final Protocol supportedProtocol;
     private final String endpointDescription;
@@ -71,6 +82,13 @@ public class JavaCoapServerEndpoint implements LwM2mServerEndpoint {
 
     public JavaCoapServerEndpoint(Protocol protocol, String endpointDescription, CoapServer coapServer,
             ServerCoapMessageTranslator translator, ServerEndpointToolbox toolbox) {
+        this(protocol, endpointDescription, coapServer, translator, toolbox, null);
+    }
+
+    public JavaCoapServerEndpoint(Protocol protocol, String endpointDescription, CoapServer coapServer,
+            ServerCoapMessageTranslator translator, ServerEndpointToolbox toolbox,
+            RegistrationStore registrationStore) {
+        this.registrationStore = registrationStore;
         this.supportedProtocol = protocol;
         this.endpointDescription = endpointDescription;
         this.coapServer = coapServer;
@@ -206,8 +224,44 @@ public class JavaCoapServerEndpoint implements LwM2mServerEndpoint {
 
     @Override
     public void cancelObservation(Observation observation) {
-        // TODO not sure there is something to implement here.
-        // Maybe trying to cancel ongoing observe request linked to this observation ?
+        // TCP has no Reset message: remove the remote relation explicitly using its original token.
+        // UDP keeps the existing reactive cancellation behavior.
+        if ((!Protocol.COAP_TCP.equals(supportedProtocol) && !Protocol.COAPS_TCP.equals(supportedProtocol))
+                || registrationStore == null || observation == null) {
+            return;
+        }
+        Registration registration = registrationStore.getRegistration(observation.getRegistrationId());
+        if (registration == null) {
+            // The registration may already have been removed, e.g. during deregistration.
+            return;
+        }
+        ClientProfile profile = toolbox.getProfileProvider()
+                .getProfile(registration.getClientTransportData().getIdentity());
+        if (profile == null || !observation.getRegistrationId().equals(profile.getRegistrationId())) {
+            return;
+        }
+        DownlinkDeviceManagementRequest<? extends LwM2mResponse> request;
+        if (observation instanceof SingleObservation) {
+            request = new CancelObservationRequest((SingleObservation) observation);
+        } else if (observation instanceof CompositeObservation) {
+            request = new CancelCompositeObservationRequest((CompositeObservation) observation);
+        } else {
+            LOG.warn("Unable to cancel unsupported observation {}", observation);
+            return;
+        }
+        try {
+            CompletableFuture<? extends LwM2mResponse> response = sendLwM2mRequest(profile, request, null);
+            timeoutAfter(response, 5000);
+            response.whenComplete((result, error) -> {
+                if (error != null) {
+                    LOG.debug("Unable to cancel observation {} at client", observation, error);
+                } else if (!result.isSuccess()) {
+                    LOG.debug("Client rejected cancellation of observation {}: {}", observation, result);
+                }
+            });
+        } catch (RuntimeException e) {
+            LOG.debug("Unable to send cancellation of observation {}", observation, e);
+        }
     }
 
     private static String getFloorKey(String sessionID) {
