@@ -26,15 +26,34 @@ data class Lwm2mProperties(
     var coapsUri: String = "coaps://0.0.0.0:5684",
     var modelsDirectory: String? = null,
     var redis: Redis = Redis(),
-    var events: Events = Events()
+    var events: Events = Events(),
+    var serverId: String = "",
+    var commands: Commands = Commands(),
+    var registrations: Registrations = Registrations()
 ) {
     data class Redis(var enabled: Boolean = true, var uri: String = "redis://localhost:6379", var prefix: String = "")
+    data class Registrations(var redisEnabled: Boolean = false, var redisPrefix: String = "")
     data class Events(var observationTopic: String = "lwm2m.observations", var sendTopic: String = "lwm2m.send", var bufferCapacity: Int = 1000)
+    data class Commands(
+        var enabled: Boolean = false,
+        var topic: String = "lwm2m.commands",
+        var resultTopic: String = "lwm2m.command-results",
+        var invalidTopic: String = "lwm2m.commands.invalid",
+        var groupId: String = "",
+        var maxInFlight: Int = 100,
+        var resultBufferCapacity: Int = 1000
+    )
 }
 
 @Configuration
 @EnableConfigurationProperties(Lwm2mProperties::class)
 class ServerConfiguration {
+    @Bean
+    fun serverIdentity(properties: Lwm2mProperties): ServerIdentity {
+        require(!properties.commands.enabled || properties.serverId.isNotBlank()) { "lwm2m.server-id is required when Kafka commands are enabled" }
+        return ServerIdentity(properties.serverId.ifBlank { "standalone" })
+    }
+
     @Bean(destroyMethod = "close")
     @ConditionalOnProperty("lwm2m.redis.enabled", havingValue = "true", matchIfMissing = true)
     fun jedisPool(properties: Lwm2mProperties) = JedisPool(URI(properties.redis.uri))
@@ -42,6 +61,7 @@ class ServerConfiguration {
     // Start only after the gateway has attached observation and Send listeners.
     @Bean(destroyMethod = "destroy")
     fun leshanServer(properties: Lwm2mProperties, pool: org.springframework.beans.factory.ObjectProvider<JedisPool>): LeshanServer {
+        require(!properties.registrations.redisEnabled || properties.redis.enabled) { "Redis registrations require lwm2m.redis.enabled=true" }
         val endpoints = CaliforniumServerEndpointsProvider.Builder(CoapServerProtocolProvider(), CoapsServerProtocolProvider())
             .addEndpoint(properties.coapUri).apply {
                 if (properties.coapsUri.isNotBlank()) addEndpoint(properties.coapsUri)
@@ -56,7 +76,11 @@ class ServerConfiguration {
                 if (properties.redis.enabled) {
                     val jedis = pool.getObject()
                     setSecurityStore(RedisSecurityStore.Builder(jedis).setPrefix(properties.redis.prefix + "SECSTORE#").build())
-                    setRegistrationStore(RedisRegistrationStore.Builder(jedis).setPrefix(properties.redis.prefix + "REGSTORE#").build())
+                    if (properties.registrations.redisEnabled) {
+                        val serverId = properties.serverId.also { require(it.isNotBlank()) { "server-id is required for isolated Redis registrations" } }
+                        val prefix = properties.registrations.redisPrefix.ifBlank { properties.redis.prefix + "REGSTORE#$serverId#" }
+                        setRegistrationStore(RedisRegistrationStore.Builder(jedis).setPrefix(prefix).build())
+                    }
                 }
             }.build()
     }
@@ -66,4 +90,9 @@ class ServerConfiguration {
 
     @Bean
     fun deviceService(gateway: DeviceGateway) = DeviceService(gateway)
+
+    @Bean
+    fun localRegistrations(server: LeshanServer): HasLocalRegistration = HasLocalRegistration {
+        server.registrationService.getByEndpoint(it) != null
+    }
 }

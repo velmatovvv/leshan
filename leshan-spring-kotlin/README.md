@@ -1,18 +1,20 @@
 # Leshan на Spring Boot и Kotlin
 
-LwM2M сервер с согласованным HTTP API, публикацией Observe и Send в Kafka и внешним Redis.
+LwM2M сервер с HTTP API, асинхронными Kafka-командами, публикацией Observe/Send и внешним Redis security store.
 Java 21, Kotlin 2.2.21, Spring Boot 3.5.7, Leshan **2.0.0-M18** (зафиксированный milestone, без SNAPSHOT).
 
 ## Архитектура
 
 `core` — отдельный модуль без Spring, Leshan, Jackson, Redis и Kafka. Содержит команды, результаты,
-модели и порты `ExecuteDeviceCommand`, `QueryDevices`, `DeviceGateway`, `PublishDeviceEvent`.
+модели и порты `ExecuteDeviceCommand`, `QueryDevices`, `DeviceGateway`, `PublishDeviceEvent`, `HasLocalRegistration`.
 `server` — адаптеры HTTP, Leshan и Kafka, а также сборка приложения и подключение Redis.
 
 ```mermaid
 flowchart LR
   HTTP[HTTP adapter] --> UC[ExecuteDeviceCommand / DeviceService]
-  Future[Будущий Kafka command consumer] -.-> UC
+  Commands[lwm2m.commands] --> Consumer[Kafka consumer]
+  Consumer --> UC
+  UC --> Results[lwm2m.command-results]
   UC --> Port[DeviceGateway]
   Port --> Leshan[Leshan adapter]
   Leshan <--> Device[Устройство LwM2M]
@@ -27,7 +29,8 @@ flowchart LR
 callback API, HTTP использует асинхронную обработку Spring MVC. Долгого ожидания устройства в servlet-потоке нет.
 `commandId` связывает команду с результатом; для HTTP его можно передать в `X-Command-Id`.
 
-Про дальнейшие команды через Kafka: [docs/architecture.md](docs/architecture.md).
+Архитектура: [docs/architecture.md](docs/architecture.md).
+Kafka-команды, конфигурация и примеры: [docs/kafka.md](docs/kafka.md).
 Полная спецификация HTTP: [docs/openapi.json](docs/openapi.json).
 
 ## Запуск
@@ -47,8 +50,10 @@ Kafka key — endpoint устройства. Топики создаются и�
 На устройстве настройте адрес этого сервера и short server ID. Bootstrap API отсутствует.
 Данные для DTLS-PSK читаются из заранее заполненного Redis через **RedisSecurityStore Leshan M18**.
 Redis должен иметь совместимую с этой версией схему; произвольный набор ключей не подойдёт.
-`RedisRegistrationStore` хранит регистрации и наблюдения; при работе сервера эти данные меняются.
-Один Redis не делает сервер кластерным: маршрутизация CoAP/DTLS между экземплярами отдельно не реализована.
+Каждый сервер имеет собственный store регистраций и наблюдений. По умолчанию это память процесса.
+Опционально включается RedisRegistrationStore с отдельным префиксом `REGSTORE#<serverId>#`.
+Security store может быть общим; регистрационные stores между серверами не объединяются.
+Fan-out Kafka-команд описан ниже. Маршрутизация входящих CoAP/DTLS-пакетов относится к инфраструктуре.
 
 | Переменная | Значение по умолчанию |
 |---|---|
@@ -56,13 +61,37 @@ Redis должен иметь совместимую с этой версией 
 | `LWM2M_COAP_URI` | `coap://0.0.0.0:5683` |
 | `LWM2M_COAPS_URI` | `coaps://0.0.0.0:5684` (пустая строка отключает CoAPS) |
 | `REDIS_URI` | `redis://localhost:6379` |
-| `REDIS_PREFIX` | пустая строка; добавляется перед штатными `SECSTORE#` и `REGSTORE#` |
+| `REDIS_PREFIX` | пустая строка; общий префикс Redis-ключей |
 | `REDIS_ENABLED` | `true`; `false` — локальный режим с памятью вместо Redis |
+| `REGISTRATIONS_REDIS_ENABLED` | `false`; отдельный store регистраций в памяти |
+| `REGISTRATIONS_REDIS_PREFIX` | пусто; при включении Redis вычисляется `<REDIS_PREFIX>REGSTORE#<serverId>#` |
 | `LWM2M_MODELS_DIRECTORY` | пусто; дополнительные DDF XML модели объектов |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` |
 | `KAFKA_OBSERVATION_TOPIC` | `lwm2m.observations` |
 | `KAFKA_SEND_TOPIC` | `lwm2m.send` |
 | `KAFKA_EVENT_BUFFER_CAPACITY` | `1000` событий |
+| `KAFKA_COMMANDS_ENABLED` | `false`; включает приём команд и публикацию результатов |
+| `LWM2M_SERVER_ID` | обязателен при включении команд или Redis-регистраций; уникален для сервера |
+| `KAFKA_COMMAND_GROUP_ID` | `lwm2m-server-<serverId>`; собственная стабильная group каждого сервера |
+| `KAFKA_COMMAND_TOPIC` | `lwm2m.commands` |
+| `KAFKA_COMMAND_RESULT_TOPIC` | `lwm2m.command-results` |
+| `KAFKA_COMMAND_INVALID_TOPIC` | `lwm2m.commands.invalid` |
+| `KAFKA_COMMAND_MAX_IN_FLIGHT` | `100` одновременно выполняющихся Kafka-команд |
+| `KAFKA_COMMAND_RESULT_BUFFER_CAPACITY` | `1000` результатов/ошибок сообщений в памяти |
+
+Для запуска Kafka-команд дополнительно создайте три command-топика и задайте:
+
+```bash
+export KAFKA_COMMANDS_ENABLED=true
+export LWM2M_SERVER_ID=node-A
+export KAFKA_COMMAND_MAX_IN_FLIGHT=100
+```
+
+Kafka consumer вызывает асинхронный `send`, затем синхронно коммитит offset без ожидания ответа.
+При достижении лимита выполняется `pause`; `poll` продолжается, после освобождения слота выполняется
+`resume`. Очередей и последовательности по устройствам нет. Команды одному устройству могут
+перекрываться; результаты могут приходить в другом порядке. Состояние команд и дедупликация отсутствуют.
+Подробности последствий сбоев и контракт — в [docs/kafka.md](docs/kafka.md).
 
 ## HTTP API
 
@@ -164,6 +193,9 @@ Send имеет тип `SEND` и отдельный топик. Все врем�
 `./mvnw verify` запускает тесты ядра, конвертации типов, отказа Kafka и интеграционные тесты:
 реальный Leshan клиент подключается по CoAP, управляется через HTTP, а события читаются из встроенного
 Kafka broker. Проверяются все 15 групп API, Composite, Send, активная отмена, сон и отсутствие
-отложенного Execute после пробуждения. Внешние Kafka, Redis и Docker для этих тестов не требуются.
+отложенного Execute после пробуждения. Kafka-команды проверяются на двух серверах с отдельными
+регистрациями: fan-out, Read Composite, Observe/Cancel, сон, истечение срока, тайм-аут, некорректные
+сообщения и pause/resume на лимите. Отдельно проверяются порядок send/commit и ключи Redis.
+Внешние Kafka, Redis и Docker для этих тестов не требуются; Redis-проверки используют mock Jedis.
 
 REST не содержит управления security, bootstrap, SSE или веб-интерфейса.

@@ -3,7 +3,7 @@
   "info": {
     "title": "Leshan Spring Kotlin device API",
     "version": "0.1.0",
-    "description": "Registered devices only. Device responses, including LwM2M failures, use HTTP 200; inspect response.success. Sleeping queue devices fail immediately without deferred commands. Kafka commands are not implemented."
+    "description": "Registered devices only. Device responses, including LwM2M failures, use HTTP 200; inspect response.success. Sleeping queue devices fail immediately without deferred commands. Kafka commands are available as an optional transport; see docs/kafka.md."
   },
   "servers": [
     {

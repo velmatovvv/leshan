@@ -2,7 +2,7 @@ package io.lwm2m.core
 
 import java.util.concurrent.CompletionStage
 
-/** Inbound port shared by REST and a future Kafka command consumer. */
+/** Inbound port shared by REST and the Kafka command consumer. */
 interface ExecuteDeviceCommand { fun execute(command: DeviceCommand): CompletionStage<CommandResult> }
 interface QueryDevices {
     fun list(): List<Device>
@@ -16,3 +16,4 @@ interface DeviceGateway {
     fun execute(command: DeviceCommand, registrationId: String): CompletionStage<DeviceResponse>
 }
 fun interface PublishDeviceEvent { fun publish(event: DeviceEvent) }
+fun interface HasLocalRegistration { fun contains(endpoint: String): Boolean }
