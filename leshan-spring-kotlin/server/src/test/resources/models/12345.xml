@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LWM2M xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.openmobilealliance.org/tech/profiles/LWM2M.xsd">
+  <Object ObjectType="MODefinition">
+    <Name>Integration test object</Name><Description1>Exercises device management operations.</Description1>
+    <ObjectID>12345</ObjectID><ObjectURN>urn:oma:lwm2m:ext:12345</ObjectURN><LWM2MVersion>1.1</LWM2MVersion><ObjectVersion>1.0</ObjectVersion>
+    <MultipleInstances>Multiple</MultipleInstances><Mandatory>Optional</Mandatory>
+    <Resources>
+      <Item ID="0"><Name>Value</Name><Operations>RW</Operations><MultipleInstances>Single</MultipleInstances><Mandatory>Optional</Mandatory><Type>Integer</Type><RangeEnumeration/><Units/><Description>Test value</Description></Item>
+      <Item ID="1"><Name>Label</Name><Operations>RW</Operations><MultipleInstances>Single</MultipleInstances><Mandatory>Optional</Mandatory><Type>String</Type><RangeEnumeration/><Units/><Description>Test label</Description></Item>
+      <Item ID="2"><Name>Action</Name><Operations>E</Operations><MultipleInstances>Single</MultipleInstances><Mandatory>Optional</Mandatory><Type/><RangeEnumeration/><Units/><Description>Test action</Description></Item>
+    </Resources><Description2/>
+  </Object>
+</LWM2M>

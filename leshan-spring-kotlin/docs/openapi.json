@@ -1,0 +1,6335 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Leshan Spring Kotlin device API",
+    "version": "0.1.0",
+    "description": "Registered devices only. Device responses, including LwM2M failures, use HTTP 200; inspect response.success. Sleeping queue devices fail immediately without deferred commands. Kafka commands are not implemented."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "paths": {
+    "/api/clients": {
+      "get": {
+        "operationId": "listDevices",
+        "summary": "List registered devices",
+        "responses": {
+          "200": {
+            "description": "Registrations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Device"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}": {
+      "get": {
+        "operationId": "getDevice",
+        "summary": "Get registration",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}": {
+      "get": {
+        "operationId": "Read_get_2",
+        "summary": "Read",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "Create_post_6",
+        "summary": "Create",
+        "description": "Requires kind=instance. id=-1 assigns an ID on the device; a provided instance ID must match the URL.",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/discover": {
+      "get": {
+        "operationId": "Discover_get_3",
+        "summary": "Discover",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/attributes": {
+      "put": {
+        "operationId": "WriteAttributes_put_4",
+        "summary": "WriteAttributes",
+        "description": "Other Leshan-supported LwM2M attributes may also be passed as query parameters.",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "pmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "pmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "gt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "lt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "st",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/observe": {
+      "post": {
+        "operationId": "Observe_post_5",
+        "summary": "Observe",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "CancelObservation_delete_6",
+        "summary": "CancelObservation",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "true sends an explicit device request; false cancels locally, even while sleeping."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}": {
+      "get": {
+        "operationId": "Read_get_6",
+        "summary": "Read",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "Write_put_10",
+        "summary": "Write",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          },
+          {
+            "name": "replace",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "Create_post_10",
+        "summary": "Create",
+        "description": "Requires kind=instance. id=-1 assigns an ID on the device; a provided instance ID must match the URL.",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "Delete_delete_10",
+        "summary": "Delete",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/discover": {
+      "get": {
+        "operationId": "Discover_get_7",
+        "summary": "Discover",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/attributes": {
+      "put": {
+        "operationId": "WriteAttributes_put_8",
+        "summary": "WriteAttributes",
+        "description": "Other Leshan-supported LwM2M attributes may also be passed as query parameters.",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "pmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "pmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "gt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "lt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "st",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/observe": {
+      "post": {
+        "operationId": "Observe_post_9",
+        "summary": "Observe",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "CancelObservation_delete_10",
+        "summary": "CancelObservation",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "true sends an explicit device request; false cancels locally, even while sleeping."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}": {
+      "get": {
+        "operationId": "Read_get_10",
+        "summary": "Read",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "Write_put_14",
+        "summary": "Write",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          },
+          {
+            "name": "replace",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "Execute_post_14",
+        "summary": "Execute",
+        "description": "Body is passed as raw LwM2M Execute arguments, e.g. 0='argument'. text/plain is recommended.",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}/discover": {
+      "get": {
+        "operationId": "Discover_get_11",
+        "summary": "Discover",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}/attributes": {
+      "put": {
+        "operationId": "WriteAttributes_put_12",
+        "summary": "WriteAttributes",
+        "description": "Other Leshan-supported LwM2M attributes may also be passed as query parameters.",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "pmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "pmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "gt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "lt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "st",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}/observe": {
+      "post": {
+        "operationId": "Observe_post_13",
+        "summary": "Observe",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "CancelObservation_delete_14",
+        "summary": "CancelObservation",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "true sends an explicit device request; false cancels locally, even while sleeping."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}/{resourceInstanceId}": {
+      "get": {
+        "operationId": "Read_get_14",
+        "summary": "Read",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "Write_put_18",
+        "summary": "Write",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          },
+          {
+            "name": "replace",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}/{resourceInstanceId}/discover": {
+      "get": {
+        "operationId": "Discover_get_15",
+        "summary": "Discover",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}/{resourceInstanceId}/attributes": {
+      "put": {
+        "operationId": "WriteAttributes_put_16",
+        "summary": "WriteAttributes",
+        "description": "Other Leshan-supported LwM2M attributes may also be passed as query parameters.",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "pmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "pmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "gt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "lt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "st",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          },
+          {
+            "name": "epmax",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Empty value removes the attribute."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/{objectId}/{instanceId}/{resourceId}/{resourceInstanceId}/observe": {
+      "post": {
+        "operationId": "Observe_post_17",
+        "summary": "Observe",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Leshan content format name, e.g. TLV or SENML_CBOR."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "CancelObservation_delete_18",
+        "summary": "CancelObservation",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "objectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "instanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "resourceInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "true sends an explicit device request; false cancels locally, even while sleeping."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/composite": {
+      "get": {
+        "operationId": "ReadComposite_get_18",
+        "summary": "ReadComposite",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "paths",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated absolute LwM2M paths, e.g. /3/0/0,/3/0/1."
+          },
+          {
+            "name": "pathformat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SENML_CBOR"
+            },
+            "description": ""
+          },
+          {
+            "name": "nodeformat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SENML_CBOR"
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "WriteComposite_put_19",
+        "summary": "WriteComposite",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "nodeformat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SENML_CBOR"
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/clients/{endpoint}/composite/observe": {
+      "post": {
+        "operationId": "ObserveComposite_post_19",
+        "summary": "ObserveComposite",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "paths",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated absolute LwM2M paths, e.g. /3/0/0,/3/0/1."
+          },
+          {
+            "name": "pathformat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SENML_CBOR"
+            },
+            "description": ""
+          },
+          {
+            "name": "nodeformat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SENML_CBOR"
+            },
+            "description": ""
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "CancelCompositeObservation_delete_20",
+        "summary": "CancelCompositeObservation",
+        "description": "",
+        "parameters": [
+          {
+            "name": "endpoint",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
+            "name": "X-Command-Id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Correlation only; does not deduplicate commands."
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300,
+              "default": 5
+            },
+            "description": "Operation timeout in seconds."
+          },
+          {
+            "name": "paths",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated absolute LwM2M paths, e.g. /3/0/0,/3/0/1."
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "true sends an explicit device request; false cancels locally, even while sleeping."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "LwM2M response or successful local cancellation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device or subscription not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Device sleeping or command expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Protocol failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Device timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CommandError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommandResult"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Node": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": -1,
+            "maximum": 65535
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "singleResource",
+              "multipleResource",
+              "resourceInstance",
+              "instance",
+              "object"
+            ],
+            "default": "singleResource"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "STRING",
+              "INTEGER",
+              "UNSIGNED_INTEGER",
+              "FLOAT",
+              "BOOLEAN",
+              "TIME",
+              "OPAQUE",
+              "OBJLNK",
+              "CORELINK"
+            ]
+          },
+          "value": {},
+          "values": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            }
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            }
+          }
+        }
+      },
+      "Device": {
+        "type": "object",
+        "required": [
+          "endpoint",
+          "registrationId",
+          "lwm2mVersion",
+          "lifetime",
+          "binding",
+          "queueMode",
+          "awake",
+          "objectLinks"
+        ],
+        "properties": {
+          "endpoint": {
+            "type": "string"
+          },
+          "registrationId": {
+            "type": "string"
+          },
+          "lwm2mVersion": {
+            "type": "string"
+          },
+          "binding": {
+            "type": "string"
+          },
+          "lifetime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "queueMode": {
+            "type": "boolean"
+          },
+          "awake": {
+            "type": "boolean"
+          },
+          "objectLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DeviceResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "success"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "content": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Node"
+            }
+          },
+          "objectLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "location": {
+            "type": "string"
+          },
+          "subscriptionId": {
+            "type": "string"
+          },
+          "errorMessage": {
+            "type": "string"
+          }
+        }
+      },
+      "CommandError": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "DEVICE_NOT_FOUND",
+              "DEVICE_SLEEPING",
+              "SUBSCRIPTION_NOT_FOUND",
+              "COMMAND_EXPIRED",
+              "TIMEOUT",
+              "REQUEST_REJECTED",
+              "REQUEST_CANCELLED",
+              "INVALID_RESPONSE",
+              "INTERNAL_ERROR"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "CommandResult": {
+        "type": "object",
+        "required": [
+          "commandId",
+          "endpoint",
+          "operation",
+          "completedAt"
+        ],
+        "properties": {
+          "commandId": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "operation": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "response": {
+            "$ref": "#/components/schemas/DeviceResponse"
+          },
+          "error": {
+            "$ref": "#/components/schemas/CommandError"
+          }
+        }
+      }
+    }
+  }
+}
