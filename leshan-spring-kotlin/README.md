@@ -7,7 +7,12 @@ Java 21, Kotlin 2.2.21, Spring Boot 3.5.7, Leshan **2.0.0-M18** (зафикси�
 
 `core` — отдельный модуль без Spring, Leshan, Jackson, Redis и Kafka. Содержит команды, результаты,
 модели и порты `ExecuteDeviceCommand`, `QueryDevices`, `DeviceGateway`, `PublishDeviceEvent`, `HasLocalRegistration`.
-`server` — адаптеры HTTP, Leshan и Kafka, а также сборка приложения и подключение Redis.
+`spring-integration` — обычный библиотечный JAR: адаптеры HTTP, Leshan, Kafka и автоконфигурация.
+`application` — самостоятельное Spring Boot приложение: создание Leshan, транспортов, моделей и Redis stores.
+
+Для внедрения в существующий проект: [docs/embedding.md](docs/embedding.md).
+Библиотека использует готовый bean `LeshanServer`, подключает и снимает только свои listeners.
+Жизненным циклом сервера и его stores управляет хост-приложение.
 
 ```mermaid
 flowchart LR
@@ -39,7 +44,7 @@ Kafka-команды, конфигурация и примеры: [docs/kafka.md
 ./mvnw verify
 export REDIS_URI=redis://localhost:6379
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-java -jar server/target/server-0.1.0-SNAPSHOT.jar
+java -jar application/target/application-0.1.0-SNAPSHOT.jar
 ```
 
 Заранее создайте Kafka топики `lwm2m.observations` и `lwm2m.send` (или переопределите имена).
@@ -70,6 +75,8 @@ Fan-out Kafka-команд описан ниже. Маршрутизация в�
 | `KAFKA_OBSERVATION_TOPIC` | `lwm2m.observations` |
 | `KAFKA_SEND_TOPIC` | `lwm2m.send` |
 | `KAFKA_EVENT_BUFFER_CAPACITY` | `1000` событий |
+| `KAFKA_EVENTS_ENABLED` | `true` в standalone; публикация Observe/Send |
+| `LWM2M_REST_ENABLED` | `true` в standalone; HTTP API |
 | `KAFKA_COMMANDS_ENABLED` | `false`; включает приём команд и публикацию результатов |
 | `LWM2M_SERVER_ID` | обязателен при включении команд или Redis-регистраций; уникален для сервера |
 | `KAFKA_COMMAND_GROUP_ID` | `lwm2m-server-<serverId>`; собственная стабильная group каждого сервера |
@@ -86,6 +93,10 @@ export KAFKA_COMMANDS_ENABLED=true
 export LWM2M_SERVER_ID=node-A
 export KAFKA_COMMAND_MAX_IN_FLIGHT=100
 ```
+
+Это переменные и defaults standalone-приложения. В библиотеке REST, Kafka-команды и Kafka-события
+выключены по умолчанию и отдельно включаются свойствами `lwm2m.rest.enabled`, `lwm2m.commands.enabled`,
+`lwm2m.events.enabled`. Файл `application.yml` поставляется только в `application`.
 
 Kafka consumer вызывает асинхронный `send`, затем синхронно коммитит offset без ожидания ответа.
 При достижении лимита выполняется `pause`; `poll` продолжается, после освобождения слота выполняется
@@ -197,5 +208,8 @@ Kafka broker. Проверяются все 15 групп API, Composite, Send, 
 регистрациями: fan-out, Read Composite, Observe/Cancel, сон, истечение срока, тайм-аут, некорректные
 сообщения и pause/resume на лимите. Отдельно проверяются порядок send/commit и ключи Redis.
 Внешние Kafka, Redis и Docker для этих тестов не требуются; Redis-проверки используют mock Jedis.
+Тесты автоконфигурации дополнительно проверяют внедрение в хост вне пакетов библиотеки,
+жизненный цикл готового LeshanServer, необязательные Kafka/MVC/Actuator зависимости и сохранение
+хостовых KafkaTemplate, ConsumerFactory, ObjectMapper и MeterRegistry.
 
 REST не содержит управления security, bootstrap, SSE или веб-интерфейса.

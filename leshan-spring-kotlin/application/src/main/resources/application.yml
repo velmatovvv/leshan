@@ -1,0 +1,55 @@
+server:
+  port: ${HTTP_PORT:8080}
+spring:
+  application:
+    name: leshan-spring-kotlin
+  mvc:
+    async:
+      request-timeout: 310s
+  jackson:
+    default-property-inclusion: non_null
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+        max.block.ms: 1000
+        buffer.memory: 33554432
+        allow.auto.create.topics: false
+lwm2m:
+  rest:
+    enabled: ${LWM2M_REST_ENABLED:true}
+  server-id: ${LWM2M_SERVER_ID:}
+  coap-uri: ${LWM2M_COAP_URI:coap://0.0.0.0:5683}
+  coaps-uri: ${LWM2M_COAPS_URI:coaps://0.0.0.0:5684}
+  models-directory: ${LWM2M_MODELS_DIRECTORY:}
+  redis:
+    enabled: ${REDIS_ENABLED:true}
+    uri: ${REDIS_URI:redis://localhost:6379}
+    prefix: ${REDIS_PREFIX:}
+  registrations:
+    redis-enabled: ${REGISTRATIONS_REDIS_ENABLED:false}
+    redis-prefix: ${REGISTRATIONS_REDIS_PREFIX:}
+  commands:
+    enabled: ${KAFKA_COMMANDS_ENABLED:false}
+    topic: ${KAFKA_COMMAND_TOPIC:lwm2m.commands}
+    result-topic: ${KAFKA_COMMAND_RESULT_TOPIC:lwm2m.command-results}
+    invalid-topic: ${KAFKA_COMMAND_INVALID_TOPIC:lwm2m.commands.invalid}
+    group-id: ${KAFKA_COMMAND_GROUP_ID:}
+    max-in-flight: ${KAFKA_COMMAND_MAX_IN_FLIGHT:100}
+    result-buffer-capacity: ${KAFKA_COMMAND_RESULT_BUFFER_CAPACITY:1000}
+  events:
+    enabled: ${KAFKA_EVENTS_ENABLED:true}
+    observation-topic: ${KAFKA_OBSERVATION_TOPIC:lwm2m.observations}
+    send-topic: ${KAFKA_SEND_TOPIC:lwm2m.send}
+    buffer-capacity: ${KAFKA_EVENT_BUFFER_CAPACITY:1000}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

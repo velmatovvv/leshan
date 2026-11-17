@@ -1,5 +1,11 @@
 # Архитектура сервера
 
+Проект состоит из `core`, библиотечного `spring-integration` и самостоятельного `application`.
+Библиотека обнаруживается через Spring Boot AutoConfiguration.imports и требует готовый bean
+LeshanServer (один или отмеченный Primary). Она не создаёт сервер, stores или транспортные endpoints.
+Standalone-приложение предоставляет этот bean и управляет его запуском, остановкой и уничтожением.
+Gateway attach/detach устанавливает и снимает только listeners интеграции, без вызовов lifecycle сервера.
+
 `core` не зависит от Spring, Kafka, Redis, Jackson или Leshan. `DeviceService` реализует входные порты
 `ExecuteDeviceCommand` и `QueryDevices`. Через выходной `DeviceGateway` выполняются операции устройства.
 Здесь проверяются срок действия, таймаут, наличие регистрации и сон устройства.
@@ -63,3 +69,4 @@ Security store Redis может быть общим. Регистрации и �
 CoAP-ретрансмиссии, но не отменяет уже выполненное действие на устройстве. Exactly-once не заявляется.
 
 Контракт и конфигурация: [kafka.md](kafka.md).
+Подключение библиотеки и необязательные зависимости: [embedding.md](embedding.md).

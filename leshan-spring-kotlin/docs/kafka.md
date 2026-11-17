@@ -7,10 +7,13 @@ export KAFKA_COMMANDS_ENABLED=true
 export LWM2M_SERVER_ID=node-A
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_COMMAND_MAX_IN_FLIGHT=100
-java -jar server/target/server-0.1.0-SNAPSHOT.jar
+java -jar application/target/application-0.1.0-SNAPSHOT.jar
 ```
 
 На другом сервере задайте другой стабильный LWM2M_SERVER_ID, например node-B.
+Пример выше относится к standalone-приложению. Для библиотечного подключения задайте свойства
+`lwm2m.commands.enabled=true`, `lwm2m.server-id=node-A` и настройки `spring.kafka.*` в конфигурации
+хоста: [embedding.md](embedding.md).
 По умолчанию group ID — `lwm2m-server-<serverId>`. Одинаковый group ID разделит сообщения между
 серверами вместо fan-out. Допускается явно задать KAFKA_COMMAND_GROUP_ID.
 

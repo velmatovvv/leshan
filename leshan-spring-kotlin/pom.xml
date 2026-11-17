@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.5.7</version><relativePath/></parent>
   <groupId>io.lwm2m</groupId><artifactId>leshan-spring-kotlin</artifactId><version>0.1.0-SNAPSHOT</version><packaging>pom</packaging>
-  <modules><module>core</module><module>server</module></modules>
+  <modules><module>core</module><module>spring-integration</module><module>application</module></modules>
   <properties><java.version>21</java.version><kotlin.version>2.2.21</kotlin.version><leshan.version>2.0.0-M18</leshan.version></properties>
   <dependencies>
     <dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-stdlib</artifactId></dependency>
