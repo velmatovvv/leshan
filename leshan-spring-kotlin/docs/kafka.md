@@ -158,8 +158,12 @@ valueBase64 отсутствует. Такие записи коммитятся
 Метрики через Actuator:
 
 - lwm2m.commands.started, .skipped, .invalid, .inflight;
+- lwm2m.commands.completed, .duration (operation/outcome), .errors (operation/code), .timeouts;
 - lwm2m.commands.consumer.pauses, .failures;
+- lwm2m.commands.consumer.paused, .pause.duration, .pause.active;
 - lwm2m.commands.publication.succeeded, .failed, .dropped.
+
+Границы измерений, значения меток и примеры запросов: [metrics.md](metrics.md).
 
 Pause на лимите не является ошибкой health. UP показывает активность consumer, а не гарантирует
 постоянную доступность broker. Состояние назначенных partitions и pause включено в детали health.

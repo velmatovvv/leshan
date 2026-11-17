@@ -3,6 +3,8 @@ package io.lwm2m.integration.adapter.kafka
 import io.lwm2m.integration.config.Lwm2mProperties
 import io.lwm2m.integration.config.ServerIdentity
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Timer
+import io.micrometer.core.instrument.LongTaskTimer
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
@@ -22,13 +24,19 @@ class KafkaCommandConsumer(
     private val handler: KafkaCommandHandler,
     properties: Lwm2mProperties,
     identity: ServerIdentity,
-    registry: MeterRegistry
+    private val registry: MeterRegistry
 ) : SmartLifecycle {
     private val log = LoggerFactory.getLogger(javaClass)
     private val running = AtomicBoolean()
     private val consumerRef = AtomicReference<Consumer<String, ByteArray>?>()
     private val failureCount = registry.counter("lwm2m.commands.consumer.failures")
     private val pauseCount = registry.counter("lwm2m.commands.consumer.pauses")
+    private val pauseDuration = registry.timer("lwm2m.commands.consumer.pause.duration")
+    private val activePause = LongTaskTimer.builder("lwm2m.commands.consumer.pause.active")
+        .description("Current pause caused by the in-flight limit").register(registry)
+    // Only the consumer thread owns these samples, including during rebalance callbacks.
+    private var pauseSample: Timer.Sample? = null
+    private var activePauseSample: LongTaskTimer.Sample? = null
     private val topic = properties.commands.topic
     val groupId: String = properties.commands.groupId.ifBlank { "lwm2m-server-${identity.serverId}" }
     private val maxInFlight = properties.commands.maxInFlight.also { require(it > 0) { "max-in-flight must be positive" } }
@@ -41,6 +49,7 @@ class KafkaCommandConsumer(
     init {
         require(setOf(topic, properties.commands.resultTopic, properties.commands.invalidTopic).size == 3) { "Command, result and invalid topics must be distinct" }
         require(listOf(topic, properties.commands.resultTopic, properties.commands.invalidTopic, groupId).all { it.isNotBlank() }) { "Kafka command topics and group-id must not be blank" }
+        registry.gauge("lwm2m.commands.consumer.paused", this) { if (it.paused) 1.0 else 0.0 }
     }
 
     override fun isRunning() = running.get()
@@ -56,12 +65,27 @@ class KafkaCommandConsumer(
         val shouldPause = handler.inFlight >= maxInFlight
         if (shouldPause) {
             val newlyPaused = partitions - consumer.paused()
-            if (newlyPaused.isNotEmpty()) { consumer.pause(newlyPaused); pauseCount.increment() }
+            if (newlyPaused.isNotEmpty()) consumer.pause(newlyPaused)
         } else {
             val toResume = consumer.paused().intersect(partitions)
             if (toResume.isNotEmpty()) consumer.resume(toResume)
         }
-        paused = shouldPause && partitions.isNotEmpty()
+        updatePauseState(shouldPause && partitions.isNotEmpty())
+    }
+
+    private fun updatePauseState(next: Boolean) {
+        if (paused == next) return
+        if (next) {
+            pauseSample = Timer.start(registry)
+            activePauseSample = activePause.start()
+            pauseCount.increment()
+        } else {
+            pauseSample?.stop(pauseDuration)
+            activePauseSample?.stop()
+            pauseSample = null
+            activePauseSample = null
+        }
+        paused = next
     }
 
     private fun consume() {
@@ -71,7 +95,10 @@ class KafkaCommandConsumer(
             consumerRef.set(consumer)
             val owner = consumer
             consumer.subscribe(listOf(topic), object : ConsumerRebalanceListener {
-                override fun onPartitionsRevoked(partitions: Collection<TopicPartition>) { assignedPartitions = assignedPartitions - partitions.toSet() }
+                override fun onPartitionsRevoked(partitions: Collection<TopicPartition>) {
+                    assignedPartitions = assignedPartitions - partitions.toSet()
+                    if (assignedPartitions.isEmpty()) updatePauseState(false)
+                }
                 override fun onPartitionsAssigned(partitions: Collection<TopicPartition>) { flowControl(owner) }
             })
             while (running.get()) {
@@ -95,9 +122,9 @@ class KafkaCommandConsumer(
         } finally {
             running.set(false)
             consumerRef.set(null)
+            updatePauseState(false)
             try { consumer?.close(Duration.ofSeconds(5)) } catch (e: Exception) { log.warn("Kafka consumer close failed", e) }
             assignedPartitions = emptySet()
-            paused = false
         }
     }
 

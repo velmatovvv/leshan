@@ -124,6 +124,7 @@ String serializer и ByteArray consumer value deserializer. Для consumer та
 приватный SimpleMeterRegistry. Библиотека закрывает только свой fallback registry.
 HTTP exception advice ограничен DeviceController и не перехватывает исключения контроллеров хоста.
 Имена стандартных beans интеграции имеют префикс lwm2m, чтобы не конфликтовать с доменными beans хоста.
+Длительности Kafka-команд и пауз, ошибки по кодам и отдельный счётчик TIMEOUT описаны в [metrics.md](metrics.md).
 
 При необходимости можно предоставить свои beans DeviceGateway, HasLocalRegistration, PublishDeviceEvent,
 CommandPublisher или пару use cases ExecuteDeviceCommand/QueryDevices — стандартные beans отступают.

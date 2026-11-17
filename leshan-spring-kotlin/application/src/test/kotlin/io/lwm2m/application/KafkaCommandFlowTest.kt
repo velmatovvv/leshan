@@ -8,6 +8,7 @@ import io.lwm2m.integration.adapter.leshan.LeshanGateway
 import io.lwm2m.integration.config.Lwm2mProperties
 import io.lwm2m.integration.config.ServerIdentity
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.admin.AdminClient
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.TopicPartition
@@ -61,6 +62,7 @@ class KafkaCommandFlowTest {
     @Autowired lateinit var producer: KafkaTemplate<String, String>
     @Autowired lateinit var publisher: CommandPublisher
     @Autowired lateinit var mainConsumer: KafkaCommandConsumer
+    @Autowired lateinit var metrics: MeterRegistry
     @Autowired lateinit var kafkaClient: io.lwm2m.integration.autoconfigure.Lwm2mKafkaClient
     private val factory get() = kafkaClient.consumerFactory
 
@@ -153,6 +155,9 @@ class KafkaCommandFlowTest {
                 destroyed = true
                 publish(envelope("timeout", "kafka-device", timeoutMs = 1000))
                 assertEquals("TIMEOUT", result("timeout").path("error").path("code").asText())
+                assertTrue(metrics.get("lwm2m.commands.timeouts").counter().count() >= 1)
+                assertTrue(metrics.get("lwm2m.commands.errors").tags("operation", "READ", "code", "TIMEOUT").counter().count() >= 1)
+                assertTrue(metrics.get("lwm2m.commands.duration").tags("operation", "READ", "outcome", "error").timer().count() >= 1)
                 assertEquals(0, foreignDispatches.get())
                 assertTrue(received.filter { it.first == "lwm2m.command-results" }.all { it.second.path("serverId").asText() == "node-A" })
             }
@@ -186,6 +191,8 @@ class KafkaCommandFlowTest {
             admin().use { admin ->
                 await().atMost(Duration.ofSeconds(10)).until { pending.size == 2 && consumer.paused && committed(admin, consumer.groupId, "capacity.commands") == 2L }
                 assertEquals(2, handler.inFlight)
+                assertEquals(1.0, registry.get("lwm2m.commands.consumer.paused").gauge().value())
+                assertEquals(1, registry.get("lwm2m.commands.consumer.pause.active").longTaskTimer().activeTasks())
                 assertFalse(pending.getValue("one").isDone)
                 assertFalse(pending.getValue("two").isDone)
                 await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(3)).untilAsserted {
@@ -203,6 +210,9 @@ class KafkaCommandFlowTest {
                 await().atMost(Duration.ofSeconds(5)).until { handler.inFlight == 0 && !consumer.paused }
                 assertEquals(listOf("two", "one", "three"), results.map { it.commandId })
                 assertTrue(registry.counter("lwm2m.commands.consumer.pauses").count() >= 1)
+                assertEquals(0.0, registry.get("lwm2m.commands.consumer.paused").gauge().value())
+                assertEquals(0, registry.get("lwm2m.commands.consumer.pause.active").longTaskTimer().activeTasks())
+                assertTrue(registry.get("lwm2m.commands.consumer.pause.duration").timer().count() >= 1)
             }
         } finally {
             pending.forEach { (id, future) -> future.complete(CommandResult(id, "same-device", Operation.READ)) }

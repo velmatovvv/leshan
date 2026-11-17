@@ -36,6 +36,7 @@ callback API, HTTP использует асинхронную обработк�
 
 Архитектура: [docs/architecture.md](docs/architecture.md).
 Kafka-команды, конфигурация и примеры: [docs/kafka.md](docs/kafka.md).
+Метрики выполнения, тайм-аутов и текущих пауз: [docs/metrics.md](docs/metrics.md).
 Полная спецификация HTTP: [docs/openapi.json](docs/openapi.json).
 
 ## Запуск
