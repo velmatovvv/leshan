@@ -7,8 +7,19 @@ Java 21, Kotlin 2.2.21, Spring Boot 3.5.7, Leshan **2.0.0-M18** (зафикси�
 
 `core` — отдельный модуль без Spring, Leshan, Jackson, Redis и Kafka. Содержит команды, результаты,
 модели и порты `ExecuteDeviceCommand`, `QueryDevices`, `DeviceGateway`, `PublishDeviceEvent`, `HasLocalRegistration`.
-`spring-integration` — обычный библиотечный JAR: адаптеры HTTP, Leshan, Kafka и автоконфигурация.
-`application` — самостоятельное Spring Boot приложение: создание Leshan, транспортов, моделей и Redis stores.
+Остальные части подключаются отдельными Maven-зависимостями:
+
+| Модуль | Назначение |
+|---|---|
+| `leshan-integration` | Адаптер Leshan, преобразование узлов, listeners и общая Spring-автоконфигурация |
+| `http-api` | HTTP API и Spring MVC; зависит от `leshan-integration`, без Kafka |
+| `kafka-integration` | Kafka-команды, результаты, Observe/Send и Kafka-метрики; зависит от `leshan-integration`, без MVC |
+| `spring-integration` | Совместимая объединяющая зависимость на `http-api` и `kafka-integration` |
+| `application` | Самостоятельное Spring Boot приложение: создание Leshan, транспортов, моделей и Redis stores |
+
+Для HTTP в существующем приложении достаточно `io.lwm2m:http-api:0.1.0-SNAPSHOT` и
+`lwm2m.rest.enabled=true`. Spring MVC подключается транзитивно. Для Kafka отдельно добавляется
+`io.lwm2m:kafka-integration:0.1.0-SNAPSHOT`. Внешние адаптеры по умолчанию выключены в библиотечном режиме.
 
 Для внедрения в существующий проект: [docs/embedding.md](docs/embedding.md).
 Библиотека использует готовый bean `LeshanServer`, подключает и снимает только свои listeners.
@@ -210,7 +221,7 @@ Kafka broker. Проверяются все 15 групп API, Composite, Send, 
 сообщения и pause/resume на лимите. Отдельно проверяются порядок send/commit и ключи Redis.
 Внешние Kafka, Redis и Docker для этих тестов не требуются; Redis-проверки используют mock Jedis.
 Тесты автоконфигурации дополнительно проверяют внедрение в хост вне пакетов библиотеки,
-жизненный цикл готового LeshanServer, необязательные Kafka/MVC/Actuator зависимости и сохранение
+жизненный цикл готового LeshanServer, HTTP без Kafka, Kafka без MVC, необязательный Actuator и сохранение
 хостовых KafkaTemplate, ConsumerFactory, ObjectMapper и MeterRegistry.
 
 REST не содержит управления security, bootstrap, SSE или веб-интерфейса.

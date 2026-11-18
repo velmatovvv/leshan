@@ -1,0 +1,4 @@
+io.lwm2m.integration.autoconfigure.LeshanKafkaInfrastructureAutoConfiguration
+io.lwm2m.integration.autoconfigure.LeshanKafkaEventsAutoConfiguration
+io.lwm2m.integration.autoconfigure.LeshanKafkaCommandsAutoConfiguration
+io.lwm2m.integration.autoconfigure.LeshanKafkaHealthAutoConfiguration

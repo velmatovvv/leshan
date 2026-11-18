@@ -3,7 +3,8 @@
   <parent><groupId>io.lwm2m</groupId><artifactId>leshan-spring-kotlin</artifactId><version>0.1.0-SNAPSHOT</version></parent>
   <artifactId>application</artifactId>
   <dependencies>
-    <dependency><groupId>io.lwm2m</groupId><artifactId>spring-integration</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>io.lwm2m</groupId><artifactId>http-api</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>io.lwm2m</groupId><artifactId>kafka-integration</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
     <dependency><groupId>org.springframework.kafka</groupId><artifactId>spring-kafka</artifactId></dependency>

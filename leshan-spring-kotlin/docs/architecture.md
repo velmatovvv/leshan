@@ -1,8 +1,30 @@
 # Архитектура сервера
 
-Проект состоит из `core`, библиотечного `spring-integration` и самостоятельного `application`.
-Библиотека обнаруживается через Spring Boot AutoConfiguration.imports и требует готовый bean
-LeshanServer (один или отмеченный Primary). Она не создаёт сервер, stores или транспортные endpoints.
+Проект разделён на модули с направленными зависимостями:
+
+```mermaid
+flowchart BT
+  Leshan[leshan-integration] --> Core[core]
+  HTTP[http-api] --> Leshan
+  Kafka[kafka-integration] --> Leshan
+  Bundle[spring-integration: совместимость] --> HTTP
+  Bundle --> Kafka
+  App[application] --> HTTP
+  App --> Kafka
+```
+
+`leshan-integration` содержит адаптер Leshan, NodeMapper, общий JSON mapper, настройки и базовую
+Spring-автоконфигурацию. `http-api` содержит контроллеры, обработку HTTP-ошибок и REST-автоконфигурацию.
+`kafka-integration` содержит контракты Kafka, consumer, publishers, метрики, опциональный health и
+Kafka-автоконфигурации. `http-api` не зависит от Kafka или Micrometer core; `kafka-integration` не
+зависит от HTTP, MVC или Servlet API. Каждый адаптер объявляет собственный AutoConfiguration.imports.
+
+`spring-integration` сохраняется как объединяющая зависимость без собственных классов и
+автоконфигураций. Имена классов, beans, HTTP-пути и свойства конфигурации сохранены. Этот артефакт
+теперь транзитивно подключает MVC и Kafka; для минимального classpath выбирайте отдельный модуль.
+
+Библиотеки обнаруживаются через Spring Boot AutoConfiguration.imports и требуют готовый bean
+LeshanServer (один или отмеченный Primary). Сервер, stores и транспортные endpoints предоставляет хост.
 Standalone-приложение предоставляет этот bean и управляет его запуском, остановкой и уничтожением.
 Gateway attach/detach устанавливает и снимает только listeners интеграции, без вызовов lifecycle сервера.
 
@@ -69,4 +91,4 @@ Security store Redis может быть общим. Регистрации и �
 CoAP-ретрансмиссии, но не отменяет уже выполненное действие на устройстве. Exactly-once не заявляется.
 
 Контракт и конфигурация: [kafka.md](kafka.md).
-Подключение библиотеки и необязательные зависимости: [embedding.md](embedding.md).
+Выбор модулей и подключение библиотеки: [embedding.md](embedding.md).

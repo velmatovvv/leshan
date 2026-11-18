@@ -2,25 +2,10 @@
   <modelVersion>4.0.0</modelVersion>
   <parent><groupId>io.lwm2m</groupId><artifactId>leshan-spring-kotlin</artifactId><version>0.1.0-SNAPSHOT</version></parent>
   <artifactId>spring-integration</artifactId>
-  <description>Reusable Spring Boot integration for an existing LeshanServer bean</description>
+  <description>Compatibility bundle combining HTTP API and Kafka integration</description>
   <dependencies>
-    <dependency><groupId>io.lwm2m</groupId><artifactId>core</artifactId><version>${project.version}</version></dependency>
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-autoconfigure</artifactId></dependency>
-    <dependency><groupId>org.eclipse.leshan</groupId><artifactId>leshan-lwm2m-server</artifactId><version>${leshan.version}</version></dependency>
-    <dependency><groupId>com.fasterxml.jackson.module</groupId><artifactId>jackson-module-kotlin</artifactId></dependency>
-    <dependency><groupId>com.fasterxml.jackson.datatype</groupId><artifactId>jackson-datatype-jsr310</artifactId></dependency>
-    <dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-reflect</artifactId></dependency>
-    <dependency><groupId>io.micrometer</groupId><artifactId>micrometer-core</artifactId></dependency>
-    <dependency><groupId>org.springframework</groupId><artifactId>spring-webmvc</artifactId><optional>true</optional></dependency>
-    <dependency><groupId>jakarta.servlet</groupId><artifactId>jakarta.servlet-api</artifactId><optional>true</optional></dependency>
-    <dependency><groupId>org.springframework.kafka</groupId><artifactId>spring-kafka</artifactId><optional>true</optional></dependency>
-    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-actuator</artifactId><optional>true</optional></dependency>
+    <dependency><groupId>io.lwm2m</groupId><artifactId>http-api</artifactId><version>${project.version}</version></dependency>
+    <dependency><groupId>io.lwm2m</groupId><artifactId>kafka-integration</artifactId><version>${project.version}</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
   </dependencies>
-  <build><plugins>
-    <plugin><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-maven-plugin</artifactId>
-      <configuration><compilerPlugins><plugin>spring</plugin></compilerPlugins></configuration>
-      <dependencies><dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-maven-allopen</artifactId><version>${kotlin.version}</version></dependency></dependencies>
-    </plugin>
-  </plugins></build>
 </project>

@@ -1,57 +1,89 @@
 # Подключение к существующему Spring Boot проекту
 
-Модуль `spring-integration` — обычный JAR без BOOT-INF и точки входа. Он использует существующий
+Модули библиотеки — обычные JAR без BOOT-INF и точки входа. Они используют существующий
 bean `org.eclipse.leshan.server.LeshanServer`. Жизненным циклом Leshan, моделями, transport endpoints,
 security store и собственным registration store каждого сервера управляет ваш проект.
 
-Сборка рассчитана на Java 21, Spring Boot 3.5.7 и Leshan 2.0.0-M18. Leshan 1.x имеет другой API.
+Сборка рассчитана на Java 21, Kotlin 2.2.21, Spring Boot 3.5.7 и Leshan 2.0.0-M18.
+Leshan 1.x имеет другой API.
 
-## Зависимость
+## Только HTTP API
 
-Для локального использования установите библиотеку вместе с parent POM и core:
+Из каталога `leshan-spring-kotlin` установите выбранный модуль вместе с parent POM и зависимостями:
 
 ```bash
-./mvnw -pl spring-integration -am install
+./mvnw -pl http-api -am install
 ```
 
-В хост-проекте добавьте:
+В хост-проекте добавьте одну зависимость:
 
 ```xml
 <dependency>
   <groupId>io.lwm2m</groupId>
-  <artifactId>spring-integration</artifactId>
+  <artifactId>http-api</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
-Для общей работы команд и запросов достаточно существующего LeshanServer. Дополнительные зависимости
-подключаются по используемому адаптеру:
+Она подключает `leshan-integration`, `core` и `spring-boot-starter-web`. Kafka, Kafka-адаптер,
+Actuator и Micrometer core не входят в её зависимости.
+
+```yaml
+lwm2m:
+  rest:
+    enabled: true
+spring:
+  mvc:
+    async:
+      request-timeout: 310s
+```
+
+`server-id` для HTTP не требуется. Существующий bean LeshanServer автоматически связывается с API.
+Дополнительный ComponentScan или Import пакетов библиотеки не нужен.
+
+```bash
+curl http://localhost:8080/api/clients
+curl 'http://localhost:8080/api/clients/device-001/3/0/0?timeout=30'
+```
+
+HTTP использует порт и context path хост-приложения. Настройка async HTTP timeout позволяет дождаться
+запросов с максимальным LwM2M timeout 300 секунд; тайм-аут операции задаётся параметром `timeout`.
+У Observe первоначальный ответ возвращается по HTTP. Последующие уведомления и входящий Send можно
+обработать своим bean `PublishDeviceEvent` либо подключить публикацию событий из `kafka-integration`.
+Потока последующих уведомлений по HTTP нет.
+
+Для CI или других машин опубликуйте выбранные JAR и их POM, включая parent POM, во внутренний
+Maven-репозиторий. Артефакты проекта не опубликованы в Maven Central.
+
+## Выбор остальных модулей
+
+| Зависимость `io.lwm2m`, версия `0.1.0-SNAPSHOT` | Что подключается |
+|---|---|
+| `core` | Команды, результаты и порты без Spring, Leshan, Jackson, Redis и Kafka |
+| `leshan-integration` | `core`, адаптер Leshan и общая Spring-автоконфигурация, без HTTP/Kafka |
+| `http-api` | `leshan-integration` и HTTP API со Spring MVC |
+| `kafka-integration` | `leshan-integration`, Spring Kafka, команды, результаты, Observe/Send и Kafka-метрики; без MVC |
+| `spring-integration` | Объединение `http-api` и `kafka-integration` для совместимости |
+
+Например, для Kafka без HTTP установите `./mvnw -pl kafka-integration -am install` и добавьте:
 
 ```xml
-<!-- Для REST на Spring MVC, если ещё не подключён -->
 <dependency>
-  <groupId>org.springframework.boot</groupId>
-  <artifactId>spring-boot-starter-web</artifactId>
-</dependency>
-
-<!-- Для Kafka-команд и/или публикации Observe/Send -->
-<dependency>
-  <groupId>org.springframework.kafka</groupId>
-  <artifactId>spring-kafka</artifactId>
-</dependency>
-
-<!-- По желанию: health Kafka consumer и метрики -->
-<dependency>
-  <groupId>org.springframework.boot</groupId>
-  <artifactId>spring-boot-starter-actuator</artifactId>
+  <groupId>io.lwm2m</groupId>
+  <artifactId>kafka-integration</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
 </dependency>
 ```
 
-Kafka, MVC, Servlet API и Actuator — optional зависимости библиотеки. Redis-клиент и транспорт
-Californium библиотека не добавляет. Их выбирает хост вместе со своей реализацией Leshan.
+Для HTTP и Kafka добавьте обе зависимости или оставьте прежнюю `spring-integration`.
+В объединяющем артефакте нет собственных классов и автоконфигураций; имена классов и настройки
+сохранены. MVC и Kafka теперь подключаются через его зависимости транзитивно. Старые явные
+зависимости хоста на `spring-boot-starter-web` и `spring-kafka` можно оставить.
 
+Actuator необязателен. Для HTTP Actuator и для health/экспорта Kafka-метрик при необходимости добавьте
+`org.springframework.boot:spring-boot-starter-actuator`. Сам учёт Kafka-метрик работает без Actuator.
+Redis-клиент и транспорт Californium библиотечные модули не добавляют: их выбирает хост.
 Автоконфигурация обнаруживается обычным `@SpringBootApplication`/`@EnableAutoConfiguration`.
-Дополнительный ComponentScan или Import пакетов библиотеки не нужен.
 
 ## Существующий сервер
 
@@ -75,7 +107,8 @@ fun leshanServer(): LeshanServer = buildConfiguredLeshanServer()
 
 ## Независимое включение адаптеров
 
-Все три внешних адаптера по умолчанию выключены в библиотечном режиме:
+HTTP API, приём Kafka-команд и публикация Kafka-событий по умолчанию выключены в библиотечном режиме.
+Следующий пример включает оба модуля, если они присутствуют в зависимостях:
 
 ```yaml
 lwm2m:
@@ -96,14 +129,16 @@ spring:
       request-timeout: 310s
 ```
 
-REST работает и без Kafka. Kafka-команды и публикация событий работают без MVC и web server.
-Actuator необязателен. `lwm2m.enabled=false` отключает стандартную интеграцию целиком.
-server-id обязателен при включении Kafka-команд и должен отличаться между серверами fan-out.
+Настройки адаптера действуют только при наличии соответствующего модуля в classpath.
+Например, `lwm2m.commands.enabled=true` при подключённом только `http-api` не создаёт Kafka-клиенты
+и не требует server-id. `lwm2m.enabled=false` отключает стандартную интеграцию целиком.
+При подключённом `kafka-integration` server-id обязателен для включённых Kafka-команд и должен
+отличаться между серверами fan-out.
 
 Настройка async HTTP timeout приведена для запросов с максимальным LwM2M timeout 300 секунд;
 библиотека сохраняет управление общими HTTP-настройками за хостом.
 
-В библиотечном JAR нет application.yml: он не устанавливает HTTP/CoAP порты, Redis URL или
+Библиотечные модули не содержат application.yml и не устанавливают HTTP/CoAP порты, Redis URL или
 глобальные Jackson/Kafka настройки. Переменные вроде KAFKA_COMMANDS_ENABLED в документации standalone
 являются aliases его application.yml. В хосте используйте YAML выше либо стандартное relaxed binding,
 например LWM2M_COMMANDS_ENABLED=true.
@@ -120,8 +155,8 @@ SASL/TLS и общие client properties берутся из `spring.kafka.*`. �
 String serializer и ByteArray consumer value deserializer. Для consumer также заданы auto-commit=false
 и max.poll.records=1; остальные ограничения и семантика описаны в [kafka.md](kafka.md).
 
-Существующий MeterRegistry используется, если есть единственный кандидат или Primary. Иначе создаётся
-приватный SimpleMeterRegistry. Библиотека закрывает только свой fallback registry.
+В `kafka-integration` существующий MeterRegistry используется, если есть единственный кандидат или
+Primary. Иначе создаётся приватный SimpleMeterRegistry. Модуль закрывает только свой fallback registry.
 HTTP exception advice ограничен DeviceController и не перехватывает исключения контроллеров хоста.
 Имена стандартных beans интеграции имеют префикс lwm2m, чтобы не конфликтовать с доменными beans хоста.
 Длительности Kafka-команд и пауз, ошибки по кодам и отдельный счётчик TIMEOUT описаны в [metrics.md](metrics.md).
@@ -132,8 +167,8 @@ CommandPublisher или пару use cases ExecuteDeviceCommand/QueryDevices —
 
 ## Standalone
 
-`application` зависит от этой же библиотеки и добавляет создание Leshan, Redis stores, endpoints,
-application.yml, HTTP server и actuator. Его настройки по умолчанию сохраняют REST и Kafka-события
+`application` явно зависит от `http-api` и `kafka-integration` и добавляет создание Leshan, Redis stores,
+endpoints, application.yml, HTTP server и actuator. Его настройки по умолчанию сохраняют REST и Kafka-события
 включёнными, Kafka-команды — выключенными.
 
 ```bash
